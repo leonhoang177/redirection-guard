@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Phishing Detector",
+  "version": "1.0.0",
+  "description": "AI-powered URL scanner to detect phishing and malicious redirects",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://www.virustotal.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
