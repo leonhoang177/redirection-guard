@@ -1,50 +1,83 @@
-# 🛡️ Redirection Guard
+# ⚙️ Redirection Guard – Chrome Extension
 
-> A lightweight, AI-powered Chrome extension and scanning toolkit designed to detect malicious web redirects and phishing attempts in real time.
-
----
-
-## 🚀 Setup & Installation
-
-Updating...
+This directory contains the **Redirection Guard Chrome Extension**, a lightweight browser tool designed to detect and block redirect-based phishing attempts in real time.
 
 ---
 
-## 🧠 System Architecture
+## 🚀 Installation & Setup Guide
 
-The **Redirection Guard** system follows a modular pipeline designed for scalability and transparency:
+Follow the steps below to set up and load the extension into Chrome:
 
-```
-User Interface → Redirection Monitor → Threat Detector → Apply Policy
+### 1️⃣ Clone the Entire Project
+
+```bash
+git clone https://github.com/<your-username>/redirection-guard.git
+cd redirection-guard/extension
 ```
 
-This flow enables proactive detection of redirect-based phishing threats, ensuring each browser navigation is analyzed, classified, and handled according to defined security policies.
+### 2️⃣ Install pnpm (if not already installed)
+
+You’ll need **pnpm** to manage the workspace efficiently.  
+Install it globally using npm:
+
+```bash
+npm install -g pnpm
+```
+
+### 3️⃣ Install Dependencies
+
+Use **pnpm** to install all required packages:
+
+```bash
+pnpm install
+```
+
+### 4️⃣ Build the Extension
+
+Compile the TypeScript and bundle the files:
+
+```bash
+pnpm run build
+```
+
+### 5️⃣ Load the Extension into Chrome
+
+1. Open **Google Chrome**.
+2. Go to **chrome://extensions/**.
+3. Enable **Developer mode** (top-right corner).
+4. Click **“Load unpacked”**.
+5. Select the **`extension`** folder from the cloned project.
+
+### 6️⃣ Use the Extension
+
+Once loaded, you’ll see the **Redirection Guard** icon in your Chrome toolbar.  
+Click it to open the popup and start protecting your browsing session.
 
 ---
 
-## ⚙️ Components
+## 🧠 Notes
 
-- **🌍 URL Scanner:**  
-  A TypeScript-based utility that gathers, enriches, and normalizes URL metadata from trusted sources (e.g., VirusTotal, PhishTank, Tranco). It outputs structured datasets for model training and validation.
-
-- **🧩 Chrome Extension:**  
-  A lightweight Manifest V3 browser extension that performs real-time redirect monitoring and phishing risk assessment directly within the user’s browser. It provides instant alerts and safe-browsing recommendations.
-
-- **🤖 Machine Learning Model:**  
-  Developed using **Google Colab**, this model learns from both lexical and metadata-based URL features to predict malicious redirections with high precision. Exported artifacts integrate seamlessly into the extension for offline inference.
+- Make sure you’ve built the extension before loading it.
+- Rebuild (`pnpm run build`) after any code changes.
+- The extension operates fully locally — no data is sent externally.
 
 ---
 
-## 📜 License
+## 🧩 Folder Overview
 
-MIT License © 2025 Ethical-Phishers Team
+```
+extension/
+├─ src/              # Source code (TypeScript)
+├─ assets/           # Model and icons
+├─ dist/             # Compiled build output
+├─ manifest.json     # Chrome extension manifest (MV3)
+└─ README.md         # Setup and usage guide
+```
 
 ---
 
-## 🤝 Acknowledgements
+## 🛡️ Project
 
-- Developed by **Leon, Mike, and Patel**
-- Supervisor: **Dr. Doowon Kim**, Assistant Professor at the University of Tennessee, Knoxville.
-- Special thanks to open-source communities supporting web security research and to the maintainers of PhishTank, Tranco, and VirusTotal APIs.
+Part of the **Redirection Guard** research project by **Leon Hoang** and collaborators under the supervision of **Dr. Doowon Kim**, University of Tennessee.
 
 ---
