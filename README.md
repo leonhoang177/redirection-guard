@@ -67,7 +67,7 @@ Click it to open the popup and start monitoring redirects in real time.
 ## 📜 License
 
 This project is licensed under the **MIT License**.  
-See the [LICENSE](../LICENSE) file for details.
+See the [LICENSE](./LICENSE) file for details.
 
 ---
 
