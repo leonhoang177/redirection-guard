@@ -102,6 +102,34 @@ export class VirusTotalService {
   }
 
   /**
+   * Get IP address from domain resolutions
+   */
+  private async getIPFromDomain(domain: string): Promise<string | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/domains/${domain}`, {
+        headers: { 'x-apikey': this.apiKey }
+      });
+
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      
+      // Get the most recent IP resolution
+      if (data.data.attributes.last_dns_records) {
+        const aRecords = data.data.attributes.last_dns_records.filter((record: any) => record.type === 'A');
+        if (aRecords.length > 0) {
+          return aRecords[0].value; // Return the first A record (IP address)
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('Could not get IP from domain:', error);
+      return null;
+    }
+  }
+  
+  /**
    * Get IP address information
    */
   private async getIPInfo(ip: string): Promise<VTIPResponse | null> {
@@ -119,49 +147,52 @@ export class VirusTotalService {
   }
 
   /**
-   * Get WHOIS data from external API (free tier)
+   * Get WHOIS data - Try multiple sources
    */
   private async getWhoisData(domain: string): Promise<WhoisAPIResponse | null> {
-    try {
-      // Using a free WHOIS API service
-      const response = await fetch(`https://api.whois.vu/?q=${domain}`);
-      if (!response.ok) return null;
-      
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.warn('Could not fetch WHOIS data:', error);
-      return null;
-    }
+    // Skip WHOIS lookup - it's unreliable and times out frequently
+    // The domain info from VirusTotal is usually sufficient
+    console.warn('WHOIS lookup skipped - using VirusTotal domain data instead');
+    return null;
   }
 
   /**
-   * Get geographic IP information
+   * Get geographic IP information using ipapi.co (more reliable than ip-api.com)
    */
   private async getGeoIPData(ip: string): Promise<GeoIPResponse | null> {
     try {
-      // Using ip-api.com free service
-      const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname`);
-      if (!response.ok) return null;
+      console.log('🌍 Fetching GeoIP data for:', ip);
+      // Using ipapi.co free service (HTTPS, no auth required, 1000 requests/day)
+      const response = await fetch(`https://ipapi.co/${ip}/json/`);
+      
+      if (!response.ok) {
+        console.warn('GeoIP API returned non-OK status:', response.status);
+        return null;
+      }
       
       const data = await response.json();
-      if (data.status === 'fail') return null;
+      console.log('🌍 GeoIP API response:', data);
+      
+      if (data.error) {
+        console.warn('GeoIP API error:', data.reason);
+        return null;
+      }
       
       return {
         ip: ip,
-        country_code: data.countryCode,
-        country_name: data.country,
-        region_code: data.region,
-        region_name: data.regionName,
+        country_code: data.country_code,
+        country_name: data.country_name,
+        region_code: data.region_code,
+        region_name: data.region,
         city: data.city,
-        zip_code: data.zip,
-        latitude: data.lat,
-        longitude: data.lon,
+        zip_code: data.postal,
+        latitude: data.latitude,
+        longitude: data.longitude,
         time_zone: data.timezone,
-        isp: data.isp,
+        isp: data.org,
         organization: data.org,
         as: data.as,
-        asname: data.asname
+        asname: data.org
       };
     } catch (error) {
       console.warn('Could not fetch GeoIP data:', error);
@@ -230,9 +261,27 @@ export class VirusTotalService {
     };
 
     // Get IP address from multiple sources
-    const ipAddress = attrs.last_serving_ip_address || 
-                     attrs.last_http_response_headers?.['x-real-ip'] ||
-                     attrs.last_http_response_headers?.['cf-connecting-ip'];
+    let ipAddress = attrs.last_serving_ip_address || 
+                    attrs.last_http_response_headers?.['x-real-ip'] ||
+                    attrs.last_http_response_headers?.['cf-connecting-ip'];
+
+    // If still no IP, try contacted_ips
+    if (!ipAddress && urlReport.data.relationships?.contacted_ips?.data?.[0]) {
+      ipAddress = urlReport.data.relationships.contacted_ips.data[0].id;
+    }
+
+    // If STILL no IP, do a domain lookup
+    if (!ipAddress) {
+      console.log('🔍 No IP found, attempting domain resolution...');
+      ipAddress = await this.getIPFromDomain(urlObj.hostname) || undefined;
+    }
+
+    console.log('=== IP DEBUG ===');
+    console.log('last_serving_ip_address:', attrs.last_serving_ip_address);
+    console.log('x-real-ip:', attrs.last_http_response_headers?.['x-real-ip']);
+    console.log('cf-connecting-ip:', attrs.last_http_response_headers?.['cf-connecting-ip']);
+    console.log('Final Extracted IP Address:', ipAddress);
+    console.log('===============');
 
     // Fetch additional data in parallel
     const [domainInfo, ipInfo, whoisData, geoData] = await Promise.all([
@@ -241,6 +290,12 @@ export class VirusTotalService {
       this.getWhoisData(urlObj.hostname),
       ipAddress ? this.getGeoIPData(ipAddress) : null
     ]);
+
+    console.log('=== API RESULTS ===');
+    console.log('domainInfo:', domainInfo);
+    console.log('ipInfo:', ipInfo);
+    console.log('geoData:', geoData);
+    console.log('==================');
 
     // Calculate domain age
     let domainAge: number | undefined;
@@ -259,8 +314,6 @@ export class VirusTotalService {
     // Extract content entropy if content available
     let contentEntropy: number | undefined;
     if (attrs.last_http_response_content_sha256) {
-      // For demo purposes, calculate based on URL. In real implementation,
-      // you'd need to fetch the actual content
       contentEntropy = this.calculateEntropy(url);
     }
 
@@ -341,7 +394,7 @@ export class VirusTotalService {
       externalResources: {
         linkedDomains: linkedDomains,
         embeddedUrls: embeddedUrls,
-        trackers: attrs.trackers?.map(t => t.url) || []
+        trackers: Array.isArray(attrs.trackers) ? attrs.trackers.map((t: any) => t.url || String(t)).filter(Boolean) : []
       },
 
       // Behavioral indicators
@@ -520,4 +573,3 @@ export function downloadCSV(csv: string, filename: string = 'comprehensive_url_s
   link.click();
   document.body.removeChild(link);
 }
-

@@ -163,9 +163,7 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
       </div>
     </div>
 
-    <!-- Basic URL Info -->
     <div class="result-section">
-      <h3>🌐 URL Information</h3>
       <div class="result-item">
         <span class="result-label">Original URL:</span><br>
         <small>${truncateText(metadata.url, 50)}</small>
@@ -184,11 +182,6 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
         <span class="result-label">🔄 Redirects:</span> ${metadata.redirectDepth}
       </div>
       ` : ''}
-    </div>
-
-    <!-- Network Information -->
-    <div class="result-section">
-      <h3>🌍 Network & Hosting</h3>
       <div class="result-item">
         <span class="result-label">IP Address:</span> ${metadata.network.ipAddress || 'N/A'}
       </div>
@@ -208,11 +201,6 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
         <span class="result-label">ISP:</span> ${metadata.network.isp}
       </div>
       ` : ''}
-    </div>
-
-    <!-- Domain Information -->
-    <div class="result-section">
-      <h3>🏷️ Domain Details</h3>
       <div class="result-item">
         <span class="result-label">Domain Age:</span> ${domainAge}
       </div>
@@ -231,11 +219,7 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
         <span class="result-label">Expires:</span> ${formatDate(metadata.domain.expirationDate)}
       </div>
       ` : ''}
-    </div>
 
-    <!-- Security Analysis -->
-    <div class="result-section">
-      <h3>🛡️ Security Analysis</h3>
       <div class="result-item">
         <span class="result-label">Malicious:</span> 
         <span class="detection-count ${metadata.detectionStats.malicious > 0 ? 'detection-danger' : ''}">${metadata.detectionStats.malicious}</span>
@@ -262,12 +246,8 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
         <span class="result-label">Reputation Score:</span> ${metadata.reputation}
       </div>
       ` : ''}
-    </div>
 
-    <!-- HTTP Information -->
-    ${metadata.httpInfo.statusCode || metadata.httpInfo.contentType || metadata.httpInfo.serverInfo ? `
-    <div class="result-section">
-      <h3>📡 HTTP Response</h3>
+      ${metadata.httpInfo.statusCode || metadata.httpInfo.contentType || metadata.httpInfo.serverInfo ? `
       ${metadata.httpInfo.statusCode ? `
       <div class="result-item">
         <span class="result-label">Status Code:</span> ${metadata.httpInfo.statusCode}
@@ -288,13 +268,9 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
         <span class="result-label">Content Length:</span> ${formatBytes(metadata.httpInfo.contentLength)}
       </div>
       ` : ''}
-    </div>
-    ` : ''}
+      ` : ''}
 
-    <!-- Content Analysis -->
-    ${metadata.contentInfo.title || metadata.contentInfo.language || metadata.contentInfo.sha256 ? `
-    <div class="result-section">
-      <h3>📄 Content Analysis</h3>
+      ${metadata.contentInfo.title || metadata.contentInfo.language || metadata.contentInfo.sha256 ? `
       ${metadata.contentInfo.title ? `
       <div class="result-item">
         <span class="result-label">Page Title:</span><br>
@@ -317,15 +293,11 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
         <span class="result-label">Content Entropy:</span> ${metadata.contentInfo.contentEntropy.toFixed(2)}
       </div>
       ` : ''}
-    </div>
-    ` : ''}
+      ` : ''}
 
-    <!-- External Resources -->
-    ${(metadata.externalResources.linkedDomains?.length || 0) > 0 || 
+      ${(metadata.externalResources.linkedDomains?.length || 0) > 0 || 
       (metadata.externalResources.embeddedUrls?.length || 0) > 0 || 
       (metadata.externalResources.trackers?.length || 0) > 0 ? `
-    <div class="result-section">
-      <h3>🔗 External Resources</h3>
       ${metadata.externalResources.linkedDomains?.length ? `
       <div class="result-item">
         <span class="result-label">Linked Domains:</span> ${metadata.externalResources.linkedDomains.length}
@@ -341,26 +313,19 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
         <span class="result-label">Trackers:</span> ${metadata.externalResources.trackers.length}
       </div>
       ` : ''}
-    </div>
-    ` : ''}
+    
+      ` : ''}
 
-    <!-- Behavioral Indicators -->
-    <div class="result-section">
-      <h3>🎯 Behavioral Analysis</h3>
       <div class="result-item">
-        <span class="result-label">JavaScript Activity:</span> ${metadata.behaviorInfo.javascriptActivity ? '✅ Detected' : '❌ None'}
+        <span class="result-label">JavaScript Activity:</span> ${metadata.behaviorInfo.javascriptActivity ? 'Detected' : 'None'}
       </div>
       <div class="result-item">
-        <span class="result-label">Suspicious Redirects:</span> ${metadata.behaviorInfo.suspiciousRedirects ? '⚠️ Yes' : '✅ No'}
+        <span class="result-label">Suspicious Redirects:</span> ${metadata.behaviorInfo.suspiciousRedirects ? '⚠️ Yes' : 'No'}
       </div>
       <div class="result-item">
-        <span class="result-label">Data URI Usage:</span> ${metadata.behaviorInfo.dataUriUsage ? '⚠️ Detected' : '✅ None'}
+        <span class="result-label">Data URI Usage:</span> ${metadata.behaviorInfo.dataUriUsage ? '⚠️ Detected' : 'None'}
       </div>
-    </div>
 
-    <!-- Scan Metadata -->
-    <div class="result-section">
-      <h3>📊 Scan Information</h3>
       <div class="result-item">
         <span class="result-label">Scan Date:</span> ${formatDate(metadata.scanDate)}
       </div>
