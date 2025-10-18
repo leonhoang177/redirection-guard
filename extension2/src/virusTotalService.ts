@@ -157,13 +157,13 @@ export class VirusTotalService {
   }
 
   /**
-   * Get geographic IP information using ipapi.co (more reliable than ip-api.com)
+   * Get geographic IP information using ip-api.com (allows CORS for extensions)
    */
   private async getGeoIPData(ip: string): Promise<GeoIPResponse | null> {
     try {
       console.log('🌍 Fetching GeoIP data for:', ip);
-      // Using ipapi.co free service (HTTPS, no auth required, 1000 requests/day)
-      const response = await fetch(`https://ipapi.co/${ip}/json/`);
+      // Using ip-api.com free service (allows CORS, 45 requests/minute)
+      const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,region,regionName,city,isp,org,as,asname`);
       
       if (!response.ok) {
         console.warn('GeoIP API returned non-OK status:', response.status);
@@ -173,33 +173,28 @@ export class VirusTotalService {
       const data = await response.json();
       console.log('🌍 GeoIP API response:', data);
       
-      if (data.error) {
-        console.warn('GeoIP API error:', data.reason);
+      if (data.status === 'fail') {
+        console.warn('GeoIP API error:', data.message);
         return null;
       }
       
       return {
         ip: ip,
-        country_code: data.country_code,
-        country_name: data.country_name,
-        region_code: data.region_code,
-        region_name: data.region,
+        country_code: data.countryCode,
+        country_name: data.country,
+        region_code: data.region,
+        region_name: data.regionName,
         city: data.city,
-        zip_code: data.postal,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        time_zone: data.timezone,
-        isp: data.org,
+        isp: data.isp,
         organization: data.org,
         as: data.as,
-        asname: data.org
+        asname: data.asname
       };
     } catch (error) {
       console.warn('Could not fetch GeoIP data:', error);
       return null;
     }
   }
-
   /**
    * Calculate content entropy (for detecting obfuscated content)
    */

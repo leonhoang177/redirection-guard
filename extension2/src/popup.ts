@@ -146,6 +146,7 @@ async function scanUrl(url: string): Promise<void> {
 }
 
 // Display Comprehensive Results
+// Display Comprehensive Results
 function displayComprehensiveResults(metadata: VTURLMetadata): void {
   const threatLevel = getThreatLevel(metadata);
   const threatClass = 
@@ -154,7 +155,7 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
 
   const domainAge = metadata.domain.domainAge 
     ? `${metadata.domain.domainAge} days (${Math.floor(metadata.domain.domainAge / 365)} years)`
-    : 'Unknown';
+    : "N/A";
 
   results.innerHTML = `
     <div style="margin-bottom: 15px;">
@@ -168,58 +169,46 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
         <span class="result-label">Original URL:</span><br>
         <small>${truncateText(metadata.url, 50)}</small>
       </div>
-      ${metadata.finalUrl && metadata.finalUrl !== metadata.url ? `
       <div class="result-item">
         <span class="result-label">Final URL:</span><br>
-        <small>${truncateText(metadata.finalUrl, 50)}</small>
-      </div>
-      ` : ''}
-      <div class="result-item">
-        <span class="result-label">Hostname:</span> ${metadata.hostname}
-      </div>
-      ${metadata.redirectDepth > 0 ? `
-      <div class="result-item">
-        <span class="result-label">🔄 Redirects:</span> ${metadata.redirectDepth}
-      </div>
-      ` : ''}
-      <div class="result-item">
-        <span class="result-label">IP Address:</span> ${metadata.network.ipAddress || 'N/A'}
+        <small>${metadata.finalUrl && metadata.finalUrl !== metadata.url ? truncateText(metadata.finalUrl, 50) : "N/A"}</small>
       </div>
       <div class="result-item">
-        <span class="result-label">Country:</span> ${formatLocationInfo(metadata)}
+        <span class="result-label">Hostname:</span> ${metadata.hostname || "N/A"}
       </div>
       <div class="result-item">
-        <span class="result-label">ASN:</span> ${metadata.network.asn || 'N/A'}
+        <span class="result-label">🔄 Redirects:</span> ${metadata.redirectDepth || 0}
       </div>
-      ${metadata.network.asOwner ? `
       <div class="result-item">
-        <span class="result-label">AS Owner:</span> ${metadata.network.asOwner}
+        <span class="result-label">IP Address:</span> ${metadata.network.ipAddress || "N/A"}
       </div>
-      ` : ''}
-      ${metadata.network.isp ? `
       <div class="result-item">
-        <span class="result-label">ISP:</span> ${metadata.network.isp}
+        <span class="result-label">Country:</span> ${metadata.network.country || "N/A"}
       </div>
-      ` : ''}
+      <div class="result-item">
+        <span class="result-label">City:</span> ${metadata.network.city || "N/A"}
+      </div>
+      <div class="result-item">
+        <span class="result-label">ASN:</span> ${metadata.network.asn || "N/A"}
+      </div>
+      <div class="result-item">
+        <span class="result-label">AS Owner:</span> ${metadata.network.asOwner || "N/A"}
+      </div>
+      <div class="result-item">
+        <span class="result-label">ISP:</span> ${metadata.network.isp || "N/A"}
+      </div>
       <div class="result-item">
         <span class="result-label">Domain Age:</span> ${domainAge}
       </div>
-      ${metadata.domain.registrar ? `
       <div class="result-item">
-        <span class="result-label">Registrar:</span> ${metadata.domain.registrar}
+        <span class="result-label">Registrar:</span> ${metadata.domain.registrar || "N/A"}
       </div>
-      ` : ''}
-      ${metadata.domain.creationDate ? `
       <div class="result-item">
-        <span class="result-label">Created:</span> ${formatDate(metadata.domain.creationDate)}
+        <span class="result-label">Created:</span> ${metadata.domain.creationDate ? formatDate(metadata.domain.creationDate) : "N/A"}
       </div>
-      ` : ''}
-      ${metadata.domain.expirationDate ? `
       <div class="result-item">
-        <span class="result-label">Expires:</span> ${formatDate(metadata.domain.expirationDate)}
+        <span class="result-label">Expires:</span> ${metadata.domain.expirationDate ? formatDate(metadata.domain.expirationDate) : "N/A"}
       </div>
-      ` : ''}
-
       <div class="result-item">
         <span class="result-label">Malicious:</span> 
         <span class="detection-count ${metadata.detectionStats.malicious > 0 ? 'detection-danger' : ''}">${metadata.detectionStats.malicious}</span>
@@ -230,116 +219,70 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
         <span class="detection-count ${metadata.detectionStats.suspicious > 2 ? 'detection-warning' : ''}">${metadata.detectionStats.suspicious}</span>
         /${metadata.detectionStats.total} engines
       </div>
-      ${metadata.impersonatedBrand ? `
       <div class="result-item">
-        <span class="result-label">⚠️ Impersonated Brand:</span> ${metadata.impersonatedBrand}
+        <span class="result-label">Impersonated Brand:</span> ${metadata.impersonatedBrand || "N/A"}
       </div>
-      ` : ''}
-      ${metadata.suspiciousFeatures && metadata.suspiciousFeatures.length > 0 ? `
       <div class="result-item">
-        <span class="result-label">⚠️ Suspicious Features:</span><br>
-        <small>${metadata.suspiciousFeatures.join(', ')}</small>
+        <span class="result-label">Suspicious Features:</span><br>
+        <small>${metadata.suspiciousFeatures && metadata.suspiciousFeatures.length > 0 ? metadata.suspiciousFeatures.join(', ') : "N/A"}</small>
       </div>
-      ` : ''}
-      ${metadata.reputation !== undefined ? `
       <div class="result-item">
-        <span class="result-label">Reputation Score:</span> ${metadata.reputation}
+        <span class="result-label">Reputation Score:</span> ${metadata.reputation !== undefined ? metadata.reputation : "N/A"}
       </div>
-      ` : ''}
-
-      ${metadata.httpInfo.statusCode || metadata.httpInfo.contentType || metadata.httpInfo.serverInfo ? `
-      ${metadata.httpInfo.statusCode ? `
       <div class="result-item">
-        <span class="result-label">Status Code:</span> ${metadata.httpInfo.statusCode}
+        <span class="result-label">Status Code:</span> ${metadata.httpInfo.statusCode || "N/A"}
       </div>
-      ` : ''}
-      ${metadata.httpInfo.contentType ? `
       <div class="result-item">
-        <span class="result-label">Content Type:</span> ${metadata.httpInfo.contentType}
+        <span class="result-label">Content Type:</span> ${metadata.httpInfo.contentType || "N/A"}
       </div>
-      ` : ''}
-      ${metadata.httpInfo.serverInfo ? `
       <div class="result-item">
-        <span class="result-label">Server:</span> ${metadata.httpInfo.serverInfo}
+        <span class="result-label">Server:</span> ${metadata.httpInfo.serverInfo || "N/A"}
       </div>
-      ` : ''}
-      ${metadata.httpInfo.contentLength ? `
       <div class="result-item">
-        <span class="result-label">Content Length:</span> ${formatBytes(metadata.httpInfo.contentLength)}
+        <span class="result-label">Content Length:</span> ${metadata.httpInfo.contentLength ? formatBytes(metadata.httpInfo.contentLength) : "N/A"}
       </div>
-      ` : ''}
-      ` : ''}
-
-      ${metadata.contentInfo.title || metadata.contentInfo.language || metadata.contentInfo.sha256 ? `
-      ${metadata.contentInfo.title ? `
       <div class="result-item">
         <span class="result-label">Page Title:</span><br>
-        <small>${truncateText(metadata.contentInfo.title, 60)}</small>
+        <small>${metadata.contentInfo.title ? truncateText(metadata.contentInfo.title, 60) : "N/A"}</small>
       </div>
-      ` : ''}
-      ${metadata.contentInfo.language ? `
       <div class="result-item">
-        <span class="result-label">Language:</span> ${metadata.contentInfo.language}
+        <span class="result-label">Language:</span> ${metadata.contentInfo.language || "N/A"}
       </div>
-      ` : ''}
-      ${metadata.contentInfo.sha256 ? `
       <div class="result-item">
         <span class="result-label">SHA256:</span><br>
-        <small style="font-family: monospace;">${metadata.contentInfo.sha256}</small>
-      </div>
-      ` : ''}
-      ${metadata.contentInfo.contentEntropy ? `
-      <div class="result-item">
-        <span class="result-label">Content Entropy:</span> ${metadata.contentInfo.contentEntropy.toFixed(2)}
-      </div>
-      ` : ''}
-      ` : ''}
-
-      ${(metadata.externalResources.linkedDomains?.length || 0) > 0 || 
-      (metadata.externalResources.embeddedUrls?.length || 0) > 0 || 
-      (metadata.externalResources.trackers?.length || 0) > 0 ? `
-      ${metadata.externalResources.linkedDomains?.length ? `
-      <div class="result-item">
-        <span class="result-label">Linked Domains:</span> ${metadata.externalResources.linkedDomains.length}
-      </div>
-      ` : ''}
-      ${metadata.externalResources.embeddedUrls?.length ? `
-      <div class="result-item">
-        <span class="result-label">Embedded URLs:</span> ${metadata.externalResources.embeddedUrls.length}
-      </div>
-      ` : ''}
-      ${metadata.externalResources.trackers?.length ? `
-      <div class="result-item">
-        <span class="result-label">Trackers:</span> ${metadata.externalResources.trackers.length}
-      </div>
-      ` : ''}
-    
-      ` : ''}
-
-      <div class="result-item">
-        <span class="result-label">JavaScript Activity:</span> ${metadata.behaviorInfo.javascriptActivity ? 'Detected' : 'None'}
+        <small style="font-family: monospace;">${metadata.contentInfo.sha256 || "N/A"}</small>
       </div>
       <div class="result-item">
-        <span class="result-label">Suspicious Redirects:</span> ${metadata.behaviorInfo.suspiciousRedirects ? '⚠️ Yes' : 'No'}
+        <span class="result-label">Content Entropy:</span> ${metadata.contentInfo.contentEntropy ? metadata.contentInfo.contentEntropy.toFixed(2) : "N/A"}
       </div>
       <div class="result-item">
-        <span class="result-label">Data URI Usage:</span> ${metadata.behaviorInfo.dataUriUsage ? '⚠️ Detected' : 'None'}
+        <span class="result-label">Linked Domains:</span> ${metadata.externalResources.linkedDomains?.length || 0}
       </div>
-
+      <div class="result-item">
+        <span class="result-label">Embedded URLs:</span> ${metadata.externalResources.embeddedUrls?.length || 0}
+      </div>
+      <div class="result-item">
+        <span class="result-label">Trackers:</span> ${metadata.externalResources.trackers?.length || 0}
+      </div>
+      <div class="result-item">
+        <span class="result-label">JavaScript Activity:</span> ${metadata.behaviorInfo.javascriptActivity ? '✅ Detected' : '❌ None'}
+      </div>
+      <div class="result-item">
+        <span class="result-label">Suspicious Redirects:</span> ${metadata.behaviorInfo.suspiciousRedirects ? '⚠️ Yes' : '✅ No'}
+      </div>
+      <div class="result-item">
+        <span class="result-label">Data URI Usage:</span> ${metadata.behaviorInfo.dataUriUsage ? '⚠️ Detected' : '✅ None'}
+      </div>
       <div class="result-item">
         <span class="result-label">Scan Date:</span> ${formatDate(metadata.scanDate)}
       </div>
-      ${metadata.passiveDns?.firstSeen ? `
       <div class="result-item">
-        <span class="result-label">First Seen:</span> ${formatDate(metadata.passiveDns.firstSeen)}
+        <span class="result-label">First Seen:</span> ${metadata.passiveDns?.firstSeen ? formatDate(metadata.passiveDns.firstSeen) : "N/A"}
       </div>
-      ` : ''}
-      ${metadata.scanId ? `
       <div class="result-item">
         <span class="result-label">Scan ID:</span><br>
-        <small style="font-family: monospace;">${metadata.scanId}</small>
+        <small style="font-family: monospace;">${metadata.scanId || "N/A"}</small>
       </div>
-      ` : ''}
     </div>
   `;
   

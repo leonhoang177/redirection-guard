@@ -10,7 +10,7 @@
   ],
   "host_permissions": [
     "https://www.virustotal.com/*",
-    "https://ipapi.co/*"
+    "http://ip-api.co/*"
   ],
   "action": {
     "default_popup": "popup.html",
