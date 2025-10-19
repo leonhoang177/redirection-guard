@@ -473,12 +473,43 @@ export class VirusTotalService {
       },
 
       // Behavioral indicators
-      behaviorInfo: {
-        javascriptActivity: this.detectJavaScriptActivity(attrs),
-        suspiciousRedirects: redirectDepth > 3,
-        dataUriUsage: embeddedUrls.some((url) => url.startsWith("data:")),
-        hiddenElements: false, // Would need content analysis
-      },
+      behaviorInfo: (() => {
+        // Prefer existing helper if available
+        let jsActivity: boolean | undefined;
+        try {
+          jsActivity = this.detectJavaScriptActivity(attrs);
+        } catch {
+          // ignore and fall back
+        }
+
+        // Fallback heuristic if helper didn't decide
+        if (typeof jsActivity === "undefined") {
+          const ct =
+            attrs?.last_http_response_headers?.[
+              "content-type"
+            ]?.toLowerCase?.() || "";
+          const hasTrackers =
+            Array.isArray(attrs?.trackers) && attrs.trackers.length > 0;
+          jsActivity =
+            ct.includes("javascript") || ct.includes("json") || hasTrackers;
+        }
+
+        // Status mapping for CSV/UI
+        let javascriptActivityStatus: StatusFlag =
+          typeof jsActivity === "boolean" ? "ok" : "unknown";
+
+        return {
+          // merged: boolean when determined, null when undetermined
+          javascriptActivityDetected:
+            typeof jsActivity === "boolean" ? jsActivity : null,
+          javascriptActivityStatus,
+          suspiciousRedirects: redirectDepth > 3,
+          dataUriUsage: Array.isArray(embeddedUrls)
+            ? embeddedUrls.some((u: string) => u.startsWith("data:"))
+            : false,
+          hiddenElements: false, // Would need content analysis to set
+        };
+      })(),
 
       // Passive DNS (limited without premium API)
       passiveDns: {
@@ -589,12 +620,18 @@ export class VirusTotalService {
     const redirect_depth =
       typeof meta.redirectDepth === "number" ? meta.redirectDepth : null;
 
-    // JavaScript activity + status
-    let javascript_activity: 0 | 1 | null = null;
-    let javascript_activity_status: StatusFlag = "unknown";
-    if (typeof meta.behaviorInfo?.javascriptActivity === "boolean") {
-      javascript_activity = meta.behaviorInfo.javascriptActivity ? 1 : 0;
-      javascript_activity_status = "ok";
+    // JavaScript activity + status (merged field)
+    let javascript_activity_detected: 0 | 1 | null = null;
+    let javascript_activity_status: StatusFlag =
+      meta.behaviorInfo?.javascriptActivityStatus ?? "unknown";
+    if (typeof meta.behaviorInfo?.javascriptActivityDetected === "boolean") {
+      javascript_activity_detected = meta.behaviorInfo
+        .javascriptActivityDetected
+        ? 1
+        : 0;
+      if (javascript_activity_status === "unknown") {
+        javascript_activity_status = "ok";
+      }
     }
 
     // HSTS + status
@@ -646,7 +683,7 @@ export class VirusTotalService {
     return {
       url: meta.url,
       redirect_depth,
-      javascript_activity,
+      javascript_activity_detected,
       javascript_activity_status,
       hsts,
       hsts_status,
@@ -693,7 +730,7 @@ export function convertToCSV(results: VTURLMetadata[]): string {
   for (const r of rows) {
     const cells = [
       r.url,
-      r.javascript_activity ?? "",
+      r.javascript_activity_detected ?? "",
       r.javascript_activity_status,
       r.hsts ?? "",
       r.hsts_status,

@@ -42,19 +42,44 @@ document.addEventListener("DOMContentLoaded", async () => {
     showStatus(`${savedResults.length} previous scan(s) loaded`, "info");
   }
 
-  // Enlarge popup and disable inner scroll
+  // Enlarge popup, disable outer scroll, 2-column layout, keep values one line with ellipsis
   const style = document.createElement("style");
   style.textContent = `
     html, body {
-      width: 800px;
-      min-height: 700px;
+      width: 780px;          /* keep within Chrome popup max */
+      height: 600px;         /* fixed height to prevent outer scroll */
       margin: 0;
-      overflow: visible !important;
+      overflow: hidden !important; /* remove outer scrollbars */
+      font-size: 14px;
     }
     #results {
       max-height: none !important;
-      overflow: visible !important;
+      overflow: hidden !important; /* no inner scroll */
     }
+    .result-section {
+      display: flex;
+      flex-direction: column; /* single column layout */
+      gap: 6px;
+    }
+    .result-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      line-height: 1.3;
+      margin: 2px 0;
+    }
+    .result-label { flex: 0 0 auto; }
+    .result-value {
+      flex: 1 1 auto;
+      white-space: nowrap;      /* single line */
+      overflow: hidden;         /* clip overflow */
+      text-overflow: ellipsis;  /* add … when too long */
+    }
+    .mono { font-family: monospace; }
+    .threat-level { display: flex; align-items: center; justify-content: center; text-align: center; }
+    .status-ok { color: #1a7f37; font-weight: 600; }        /* green */
+    .status-unknown { color: #2563eb; font-weight: 600; }  /* blue */
+    .status-error { color: #c2410c; font-weight: 600; }    /* orange */
   `;
   document.head.appendChild(style);
 });
@@ -214,10 +239,10 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
     ? pageUrlForScheme.protocol === "https:"
     : undefined;
 
-  const finalUrlDisplay =
-    metadata.finalUrl && metadata.finalUrl !== metadata.url
-      ? truncateText(metadata.finalUrl, 50)
-      : "Same as original";
+  const finalUrlDisplay = (() => {
+    const fu = metadata.finalUrl || metadata.url;
+    return fu; // if same as original, just print the URL again
+  })();
 
   const certSummaryDisplay = (() => {
     if (metadata.certificateInfo) {
@@ -261,6 +286,35 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
     return "Error"; // extractor failed / not available
   })();
 
+  // JavaScript Activity display (value + status)
+  const jsActivityStatus = (() => {
+    const s = metadata.behaviorInfo.javascriptActivityStatus;
+    if (s === "ok") return "Ok";
+    if (s === "not_present") return "Unknown"; // URL does not provide it
+    if (s === "error") return "Error";
+    return "Unknown"; // default for undefined/unknown
+  })();
+
+  const jsActivityValue = (() => {
+    if (typeof metadata.behaviorInfo.javascriptActivityDetected === "boolean") {
+      return metadata.behaviorInfo.javascriptActivityDetected
+        ? "Detected"
+        : "None";
+    }
+    // If missing/unknown, prefer explicit label
+    return "None";
+  })();
+
+  // Status to CSS class mapper
+  const statusClass = (s: string) =>
+    s === "Ok"
+      ? "status-ok"
+      : s === "Unknown"
+      ? "status-unknown"
+      : s === "Error"
+      ? "status-error"
+      : "";
+
   results.innerHTML = `
     <div style="width: 800px; font-size: 15px;">
       <div style="margin-bottom: 12px;">
@@ -269,19 +323,19 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
         </div>
       </div>
 
-      <div class="result-item" style="margin: 6px 0 14px 0;">
-        <span class="result-label">Status Legend:</span><br>
-        <small>Ok: means it is good · Unknown: the URL does not provide it · Error: the extractor failed to get it</small>
+      <div class="result-item" style="margin: 6px 0 12px 0;">
+        <span class="result-label">Status Legend:</span>
+        <span class="result-value">Ok = good · Unknown = URL does not provide it · Error = extractor failed</span>
       </div>
 
       <div class="result-section">
         <div class="result-item">
-          <span class="result-label">1. Original URL:</span><br>
-          <small>${truncateText(metadata.url, 50)}</small>
+          <span class="result-label">1. Original URL:</span>
+          <span class="result-value">${metadata.url}</span>
         </div>
         <div class="result-item">
-          <span class="result-label">2. Final URL:</span><br>
-          <small>${finalUrlDisplay}</small>
+          <span class="result-label">2. Final URL:</span>
+          <span class="result-value">${finalUrlDisplay}</span>
         </div>
         <div class="result-item">
           <span class="result-label">3. Hostname:</span> ${
@@ -346,12 +400,12 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
           }
         </div>
         <div class="result-item">
-          <span class="result-label">15. Certificate (Issuer → Subject):</span><br>
-          <small>${certSummaryDisplay}</small>
+          <span class="result-label">15. Certificate (Issuer → Subject):</span>
+          <span class="result-value">${certSummaryDisplay}</span>
         </div>
         <div class="result-item">
-          <span class="result-label">16. Certificate Validity:</span><br>
-          <small>${certValidityDisplay}</small>
+          <span class="result-label">16. Certificate Validity:</span>
+          <span class="result-value">${certValidityDisplay}</span>
         </div>
         <div class="result-item">
           <span class="result-label">17. Malicious:</span> 
@@ -383,13 +437,13 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
           }
         </div>
         <div class="result-item">
-          <span class="result-label">21. Suspicious Features:</span><br>
-          <small>${
+          <span class="result-label">21. Suspicious Features:</span>
+          <span class="result-value">${
             metadata.suspiciousFeatures &&
             metadata.suspiciousFeatures.length > 0
               ? metadata.suspiciousFeatures.join(", ")
               : "N/A"
-          }</small>
+          }</span>
         </div>
         <div class="result-item">
           <span class="result-label">22. Reputation Score:</span> ${
@@ -402,7 +456,10 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
           }
         </div>
         <div class="result-item">
-          <span class="result-label">24. HSTS:</span> ${hstsStatus}
+          <span class="result-label">24. HSTS:</span>
+          <span class="result-value"><span class="${statusClass(
+            hstsStatus
+          )}">${hstsStatus}</span></span>
         </div>
         <div class="result-item">
           <span class="result-label">25. Content Type:</span> ${
@@ -422,21 +479,19 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
           }
         </div>
         <div class="result-item">
-          <span class="result-label">28. Page Title:</span><br>
-          <small>${
-            metadata.contentInfo.title
-              ? truncateText(metadata.contentInfo.title, 60)
-              : "N/A"
-          }</small>
+          <span class="result-label">28. Page Title:</span>
+          <span class="result-value">${
+            metadata.contentInfo.title ? metadata.contentInfo.title : "N/A"
+          }</span>
         </div>
         <div class="result-item">
           <span class="result-label">29. Language:</span> ${languageDisplay}
         </div>
         <div class="result-item">
-          <span class="result-label">30. SHA256:</span><br>
-          <small style="font-family: monospace;">${
+          <span class="result-label">30. SHA256:</span>
+          <span class="result-value mono">${
             metadata.contentInfo.sha256 || "N/A"
-          }</small>
+          }</span>
         </div>
         <div class="result-item">
           <span class="result-label">31. Content Entropy:</span> ${
@@ -461,9 +516,10 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
           }
         </div>
         <div class="result-item">
-          <span class="result-label">35. JavaScript Activity:</span> ${
-            metadata.behaviorInfo.javascriptActivity ? "Detected" : "None"
-          }
+          <span class="result-label">35. JavaScript Activity:</span>
+          <span class="result-value">${jsActivityValue} <span class="${statusClass(
+    jsActivityStatus
+  )}">(${jsActivityStatus})</span></span>
         </div>
         <div class="result-item">
           <span class="result-label">36. Suspicious Redirects:</span> ${
@@ -488,10 +544,8 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
           }
         </div>
         <div class="result-item">
-          <span class="result-label">40. Scan ID:</span><br>
-          <small style="font-family: monospace;">${
-            metadata.scanId || "N/A"
-          }</small>
+          <span class="result-label">40. Scan ID:</span>
+          <span class="result-value mono">${metadata.scanId || "N/A"}</span>
         </div>
       </div>
     </div>

@@ -96,7 +96,11 @@ export interface VTURLMetadata {
 
   // Behavioral indicators
   behaviorInfo: {
-    javascriptActivity?: boolean;
+    /** Whether JavaScript activity was detected (true/false), or null if undetermined */
+    javascriptActivityDetected?: boolean | null;
+
+    /** Status flag for JS activity (preferred for ML/export) */
+    javascriptActivityStatus?: StatusFlag;
     suspiciousRedirects?: boolean;
     dataUriUsage?: boolean;
     hiddenElements?: boolean;
@@ -316,7 +320,7 @@ export interface FlatScanRow {
   url: string;
   redirect_depth: number | null;
 
-  javascript_activity: 0 | 1 | null;
+  javascript_activity_detected: 0 | 1 | null;
   javascript_activity_status: StatusFlag;
 
   hsts: 0 | 1 | null;
