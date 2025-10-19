@@ -7,7 +7,7 @@ export interface VTURLMetadata {
   finalUrl?: string;
   redirectChain?: string[];
   redirectDepth: number;
-  
+
   // Domain and WHOIS info
   domain: {
     registrar?: string;
@@ -16,7 +16,7 @@ export interface VTURLMetadata {
     domainAge?: number;
     whoisData?: WhoisData;
   };
-  
+
   // Network and hosting info
   network: {
     ipAddress?: string;
@@ -28,7 +28,7 @@ export interface VTURLMetadata {
     isp?: string;
     hostingProvider?: string;
   };
-  
+
   // HTTP response info
   httpInfo: {
     statusCode?: number;
@@ -37,8 +37,10 @@ export interface VTURLMetadata {
     contentType?: string;
     contentLength?: number;
     serverInfo?: string;
+    /** Whether HSTS is present via the Strict-Transport-Security header */
+    hsts?: boolean;
   };
-  
+
   // TLS/SSL Certificate info
   tlsInfo?: {
     issuer: string;
@@ -49,7 +51,22 @@ export interface VTURLMetadata {
     sanEntries?: string[];
     fingerprint?: string;
   };
-  
+
+  /** Vendor votes summary (VirusTotal attributes.total_votes) */
+  votes?: {
+    harmless: number;
+    malicious: number;
+  };
+
+  /** Parsed TLS certificate summary (from attributes.last_https_certificate) */
+  certificateInfo?: {
+    issuerCN?: string;
+    subjectCN?: string;
+    notBefore?: string; // ISO 8601
+    notAfter?: string; // ISO 8601
+    serialNumber?: string;
+  };
+
   // Content and security analysis
   contentInfo: {
     title?: string;
@@ -61,14 +78,14 @@ export interface VTURLMetadata {
     mimeType?: string;
     contentEntropy?: number;
   };
-  
+
   // Detection and threat info
   detectionStats: DetectionStats;
   threatCategories?: string[];
   malwareFamily?: string[];
   impersonatedBrand?: string;
   suspiciousFeatures?: string[];
-  
+
   // External resources and links
   externalResources: {
     linkedDomains?: string[];
@@ -76,7 +93,7 @@ export interface VTURLMetadata {
     externalScripts?: string[];
     trackers?: string[];
   };
-  
+
   // Behavioral indicators
   behaviorInfo: {
     javascriptActivity?: boolean;
@@ -84,7 +101,7 @@ export interface VTURLMetadata {
     dataUriUsage?: boolean;
     hiddenElements?: boolean;
   };
-  
+
   // Passive DNS and historical data
   passiveDns?: {
     firstSeen?: string;
@@ -92,7 +109,7 @@ export interface VTURLMetadata {
     distinctIps?: string[];
     totalResolutions?: number;
   };
-  
+
   // Metadata
   scanDate: string;
   scanId?: string;
@@ -142,9 +159,9 @@ export interface VTURLResponse {
     type: string;
     attributes: VTURLAttributes;
     relationships?: {
-      network_location?: { data: { id: string; type: string; } };
-      contacted_domains?: { data: Array<{ id: string; type: string; }> };
-      contacted_ips?: { data: Array<{ id: string; type: string; }> };
+      network_location?: { data: { id: string; type: string } };
+      contacted_domains?: { data: Array<{ id: string; type: string }> };
+      contacted_ips?: { data: Array<{ id: string; type: string }> };
     };
   };
 }
@@ -158,25 +175,28 @@ export interface VTURLAttributes {
     undetected: number;
     timeout: number;
   };
-  last_analysis_results?: Record<string, {
-    category: string;
-    engine_name: string;
-    engine_version: string;
-    result: string;
-    method: string;
-  }>;
-  
+  last_analysis_results?: Record<
+    string,
+    {
+      category: string;
+      engine_name: string;
+      engine_version: string;
+      result: string;
+      method: string;
+    }
+  >;
+
   // HTTP info
   last_http_response_code?: number;
   last_http_response_headers?: Record<string, string>;
   last_http_response_content_sha256?: string;
   last_http_response_content_length?: number;
   last_serving_ip_address?: string;
-  
+
   // Redirect info
   last_final_url?: string;
   redirection_chain?: string[];
-  
+
   // Content info
   title?: string;
   favicon?: string;
@@ -186,20 +206,20 @@ export interface VTURLAttributes {
     language?: string;
     author?: string[];
   };
-  
+
   // Categories and tags
   categories?: Record<string, string>;
   tags?: string[];
-  
+
   // Trackers and external resources
   trackers?: Record<string, any>[];
   outgoing_links?: string[];
-  
+
   // Timestamps
   first_submission_date?: number;
   last_analysis_date?: number;
   last_modification_date?: number;
-  
+
   // Additional attributes
   threat_names?: string[];
   popular_threat_name?: string;
@@ -286,4 +306,31 @@ export interface GeoIPResponse {
   organization?: string;
   as?: string;
   asname?: string;
+}
+
+// ===== Flat training row schema (value + status) =====
+export type StatusFlag = "ok" | "not_present" | "unknown" | "error";
+
+// Flat CSV-friendly row used for model training
+export interface FlatScanRow {
+  url: string;
+  redirect_depth: number | null;
+
+  javascript_activity: 0 | 1 | null;
+  javascript_activity_status: StatusFlag;
+
+  hsts: 0 | 1 | null;
+  hsts_status: StatusFlag;
+
+  status_code: number | null;
+  status_code_status: StatusFlag;
+
+  vt_votes_harmless: number | null;
+  vt_votes_malicious: number | null;
+  vt_votes_status: StatusFlag;
+
+  tls_valid_days: number | null;
+  tls_valid_days_status: StatusFlag;
+
+  reputation_score: number | null;
 }
