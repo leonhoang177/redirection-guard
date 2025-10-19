@@ -1,17 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "Phishing Detector",
-  "version": "1.0.0",
-  "description": "AI-powered URL scanner to detect phishing and malicious redirects",
+  "name": "Comprehensive Phishing Detector",
+  "version": "2.0.0",
+  "description": "AI-powered comprehensive URL scanner with deep analysis using VirusTotal and additional threat intelligence APIs",
   "permissions": [
     "activeTab",
     "storage",
     "downloads"
   ],
   "host_permissions": [
-    "https://www.virustotal.com/*"
+    "https://www.virustotal.com/*",
+    "http://ip-api.co/*"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_title": "Comprehensive Phishing Detector"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }
