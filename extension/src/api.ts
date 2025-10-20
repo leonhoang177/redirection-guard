@@ -20,6 +20,29 @@ export class VirusTotalService {
   }
 
   /**
+   * Safely convert heterogeneous date representations to ISO string.
+   * Accepts UNIX seconds, UNIX milliseconds, or parseable date strings.
+   */
+  private toISO(value: any): string | undefined {
+    if (value === null || value === undefined) return undefined;
+    let ms: number | undefined;
+
+    if (typeof value === "number") {
+      // Heuristic: treat as seconds if clearly not in ms
+      ms = value > 1e12 ? value : value * 1000;
+    } else if (typeof value === "string") {
+      const parsed = Date.parse(value);
+      if (!Number.isNaN(parsed)) ms = parsed;
+    }
+
+    if (typeof ms === "number") {
+      const d = new Date(ms);
+      if (!Number.isNaN(d.getTime())) return d.toISOString();
+    }
+    return undefined;
+  }
+
+  /**
    * Comprehensive URL analysis with enhanced metadata extraction
    */
   async scanURL(url: string): Promise<VTURLMetadata> {
@@ -271,26 +294,7 @@ export class VirusTotalService {
         }
       : undefined;
 
-    // NEW: TLS certificate summary
-    let certificateInfo: VTURLMetadata["certificateInfo"] = undefined;
-    if (attrsAny?.last_https_certificate) {
-      const cert = attrsAny.last_https_certificate;
-      const issuerCN = cert?.issuer?.CN || cert?.issuer?.common_name;
-      const subjectCN = cert?.subject?.CN || cert?.subject?.common_name;
-      const notBefore = cert?.validity?.not_before
-        ? new Date(cert.validity.not_before * 1000).toISOString()
-        : undefined;
-      const notAfter = cert?.validity?.not_after
-        ? new Date(cert.validity.not_after * 1000).toISOString()
-        : undefined;
-      certificateInfo = {
-        issuerCN,
-        subjectCN,
-        notBefore,
-        notAfter,
-        serialNumber: cert?.serial_number,
-      };
-    }
+    // (TLS certificate summary is now extracted after fetching domain/IP info)
 
     if (!attrs.last_analysis_stats) {
       throw new Error(
@@ -349,20 +353,41 @@ export class VirusTotalService {
     console.log("geoData:", geoData);
     console.log("==================");
 
+    // TLS certificate summary (prefer domain/IP objects; URL report doesn't include cert)
+    let certificateInfo: VTURLMetadata["certificateInfo"] = undefined;
+    const domainCert: any = (domainInfo as any)?.data?.attributes
+      ?.last_https_certificate;
+    const ipCert: any = (ipInfo as any)?.data?.attributes
+      ?.last_https_certificate;
+    const vtCert = domainCert || ipCert;
+
+    if (vtCert) {
+      const issuerCN = vtCert?.issuer?.CN ?? vtCert?.issuer?.common_name;
+      const subjectCN = vtCert?.subject?.CN ?? vtCert?.subject?.common_name;
+      const notBefore = this.toISO(vtCert?.validity?.not_before);
+      const notAfter = this.toISO(vtCert?.validity?.not_after);
+
+      certificateInfo = {
+        issuerCN,
+        subjectCN,
+        notBefore,
+        notAfter,
+        serialNumber: vtCert?.serial_number,
+      };
+    }
+
     // Calculate domain age
     let domainAge: number | undefined;
-    if (domainInfo?.data.attributes.creation_date) {
-      const creationDate = new Date(
-        domainInfo.data.attributes.creation_date * 1000
-      );
-      domainAge = Math.floor(
-        (Date.now() - creationDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
-    } else if (whoisData?.creation_date) {
-      const creationDate = new Date(whoisData.creation_date);
-      domainAge = Math.floor(
-        (Date.now() - creationDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
+    if (domainInfo?.data.attributes.creation_date || whoisData?.creation_date) {
+      const iso =
+        this.toISO(domainInfo?.data.attributes.creation_date) ??
+        this.toISO(whoisData?.creation_date);
+      if (iso) {
+        const t = Date.parse(iso);
+        if (!Number.isNaN(t)) {
+          domainAge = Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24));
+        }
+      }
     }
 
     // Extract redirect information
@@ -381,6 +406,12 @@ export class VirusTotalService {
 
     // Build comprehensive metadata object
     const metadata: VTURLMetadata = {
+      // Metadata
+      scanId: urlReport.data.id,
+      reputation:
+        domainInfo?.data.attributes.reputation ||
+        ipInfo?.data.attributes.reputation,
+
       // Basic URL info
       url: url,
       hostname: urlObj.hostname,
@@ -393,16 +424,12 @@ export class VirusTotalService {
       domain: {
         registrar:
           domainInfo?.data.attributes.registrar || whoisData?.registrar,
-        creationDate: domainInfo?.data.attributes.creation_date
-          ? new Date(
-              domainInfo.data.attributes.creation_date * 1000
-            ).toISOString()
-          : whoisData?.creation_date,
-        expirationDate: domainInfo?.data.attributes.expiration_date
-          ? new Date(
-              domainInfo.data.attributes.expiration_date * 1000
-            ).toISOString()
-          : whoisData?.expiration_date,
+        creationDate:
+          this.toISO(domainInfo?.data.attributes.creation_date) ??
+          this.toISO(whoisData?.creation_date),
+        expirationDate:
+          this.toISO(domainInfo?.data.attributes.expiration_date) ??
+          this.toISO(whoisData?.expiration_date),
         domainAge: domainAge,
         whoisData: whoisData
           ? {
@@ -513,20 +540,10 @@ export class VirusTotalService {
 
       // Passive DNS (limited without premium API)
       passiveDns: {
-        firstSeen: attrs.first_submission_date
-          ? new Date(attrs.first_submission_date * 1000).toISOString()
-          : undefined,
-        lastSeen: attrs.last_analysis_date
-          ? new Date(attrs.last_analysis_date * 1000).toISOString()
-          : undefined,
+        firstSeen: this.toISO(attrs.first_submission_date),
+        lastSeen: this.toISO(attrs.last_analysis_date),
       },
 
-      // Metadata
-      scanDate: new Date().toISOString(),
-      scanId: urlReport.data.id,
-      reputation:
-        domainInfo?.data.attributes.reputation ||
-        ipInfo?.data.attributes.reputation,
       // NEW fields
       votes: totalVotes,
       certificateInfo,

@@ -1,5 +1,9 @@
 // Enhanced VirusTotal API Response Types with comprehensive metadata
 export interface VTURLMetadata {
+  // Metadata
+  scanId?: string;
+  reputation?: number;
+
   // Basic URL info
   url: string;
   hostname: string;
@@ -113,11 +117,6 @@ export interface VTURLMetadata {
     distinctIps?: string[];
     totalResolutions?: number;
   };
-
-  // Metadata
-  scanDate: string;
-  scanId?: string;
-  reputation?: number;
 }
 
 export interface WhoisData {

@@ -1,8 +1,4 @@
-import {
-  VirusTotalService,
-  convertToCSV,
-  downloadCSV,
-} from "./virusTotalService.js";
+import { VirusTotalService, convertToCSV, downloadCSV } from "./api.js";
 import { VTURLMetadata } from "./types.js";
 
 // Storage for scan results
@@ -210,7 +206,6 @@ async function scanUrl(url: string): Promise<void> {
 }
 
 // Display Comprehensive Results
-// Display Comprehensive Results
 function displayComprehensiveResults(metadata: VTURLMetadata): void {
   const threatLevel = getThreatLevel(metadata);
   const threatClass =
@@ -315,6 +310,363 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
       ? "status-error"
       : "";
 
+  const items: { label: string; valueHtml: string }[] = [
+    // ===== Metadata =====
+    { label: "Scan ID", valueHtml: `${metadata.scanId || "N/A"}` },
+    {
+      label: "Reputation Score",
+      valueHtml: `${
+        metadata.reputation !== undefined ? metadata.reputation : "N/A"
+      }`,
+    },
+
+    // ===== Basic URL info =====
+    { label: "Original URL", valueHtml: `${metadata.url}` },
+    { label: "Hostname", valueHtml: `${metadata.hostname || "N/A"}` },
+    { label: "Path", valueHtml: `${metadata.path || "/"}` },
+    { label: "Final URL", valueHtml: `${finalUrlDisplay}` },
+    {
+      label: "Redirect Chain",
+      valueHtml: `${
+        metadata.redirectChain?.length
+          ? `${metadata.redirectChain.length} hops`
+          : "0"
+      }`,
+    },
+    { label: "Redirect Depth", valueHtml: `${metadata.redirectDepth || 0}` },
+
+    // ===== Domain and WHOIS info =====
+    { label: "Registrar", valueHtml: `${metadata.domain.registrar || "N/A"}` },
+    {
+      label: "Created",
+      valueHtml: `${
+        metadata.domain.creationDate
+          ? formatDate(metadata.domain.creationDate)
+          : "N/A"
+      }`,
+    },
+    {
+      label: "Expires",
+      valueHtml: `${
+        metadata.domain.expirationDate
+          ? formatDate(metadata.domain.expirationDate)
+          : "N/A"
+      }`,
+    },
+    { label: "Domain Age", valueHtml: `${domainAge}` },
+    {
+      label: "WHOIS Registrar URL",
+      valueHtml: `${metadata.domain.whoisData?.registrarUrl || "N/A"}`,
+    },
+    {
+      label: "WHOIS Updated",
+      valueHtml: `${
+        metadata.domain.whoisData?.updatedDate
+          ? formatDate(metadata.domain.whoisData.updatedDate)
+          : "N/A"
+      }`,
+    },
+    {
+      label: "Name Servers",
+      valueHtml: `${metadata.domain.whoisData?.nameServers?.length || 0}`,
+    },
+    {
+      label: "WHOIS Contacts",
+      valueHtml: `${(() => {
+        const c = metadata.domain.whoisData?.contacts;
+        if (!c) return "N/A";
+        const parts: string[] = [];
+        if (c.registrant) parts.push("registrant");
+        if (c.admin) parts.push("admin");
+        if (c.tech) parts.push("tech");
+        return parts.length ? parts.join(", ") : "N/A";
+      })()}`,
+    },
+
+    // ===== Network and hosting info =====
+    {
+      label: "IP Address",
+      valueHtml: `${metadata.network.ipAddress || "N/A"}`,
+    },
+    { label: "ASN", valueHtml: `${metadata.network.asn || "N/A"}` },
+    { label: "AS Owner", valueHtml: `${metadata.network.asOwner || "N/A"}` },
+    { label: "Country", valueHtml: `${metadata.network.country || "N/A"}` },
+    { label: "Continent", valueHtml: `${metadata.network.continent || "N/A"}` },
+    { label: "City", valueHtml: `${metadata.network.city || "N/A"}` },
+    { label: "ISP", valueHtml: `${metadata.network.isp || "N/A"}` },
+    {
+      label: "Hosting Provider",
+      valueHtml: `${
+        metadata.network.hostingProvider || metadata.network.asOwner || "N/A"
+      }`,
+    },
+
+    // ===== HTTP response info =====
+    {
+      label: "Status Code",
+      valueHtml: `${metadata.httpInfo.statusCode || "N/A"}`,
+    },
+    {
+      label: "Response Time",
+      valueHtml: `${
+        metadata.httpInfo.responseTime !== undefined
+          ? metadata.httpInfo.responseTime + " ms"
+          : "N/A"
+      }`,
+    },
+    {
+      label: "Headers",
+      valueHtml: `${
+        metadata.httpInfo.headers
+          ? Object.keys(metadata.httpInfo.headers).length + " headers"
+          : "N/A"
+      }`,
+    },
+    {
+      label: "Content Type",
+      valueHtml: `${metadata.httpInfo.contentType || "N/A"}`,
+    },
+    {
+      label: "Content Length",
+      valueHtml: `${
+        metadata.httpInfo.contentLength
+          ? formatBytes(metadata.httpInfo.contentLength)
+          : "N/A"
+      }`,
+    },
+    { label: "Server", valueHtml: `${metadata.httpInfo.serverInfo || "N/A"}` },
+    {
+      label: "HSTS",
+      valueHtml: `<span class="${statusClass(
+        hstsStatus
+      )}">${hstsStatus}</span>`,
+    },
+
+    // ===== TLS/SSL Certificate info (tlsInfo) =====
+    {
+      label: "TLS Issuer (raw)",
+      valueHtml: `${metadata.tlsInfo?.issuer || "N/A"}`,
+    },
+    {
+      label: "TLS Subject (raw)",
+      valueHtml: `${metadata.tlsInfo?.subject || "N/A"}`,
+    },
+    {
+      label: "TLS Valid From",
+      valueHtml: `${
+        metadata.tlsInfo?.validFrom
+          ? formatDate(metadata.tlsInfo.validFrom)
+          : "N/A"
+      }`,
+    },
+    {
+      label: "TLS Valid To",
+      valueHtml: `${
+        metadata.tlsInfo?.validTo ? formatDate(metadata.tlsInfo.validTo) : "N/A"
+      }`,
+    },
+    {
+      label: "TLS Serial",
+      valueHtml: `${metadata.tlsInfo?.serialNumber || "N/A"}`,
+    },
+    {
+      label: "TLS SAN Count",
+      valueHtml: `${metadata.tlsInfo?.sanEntries?.length ?? 0}`,
+    },
+    {
+      label: "TLS Fingerprint",
+      valueHtml: `${metadata.tlsInfo?.fingerprint || "N/A"}`,
+    },
+
+    // ===== Vendor votes summary =====
+    {
+      label: "VT Votes",
+      valueHtml: `${
+        metadata.votes
+          ? `${metadata.votes.harmless ?? 0} harmless / ${
+              metadata.votes.malicious ?? 0
+            } malicious`
+          : "N/A"
+      }`,
+    },
+
+    // ===== Parsed TLS certificate summary (certificateInfo) =====
+    {
+      label: "Certificate (Issuer → Subject)",
+      valueHtml: `${certSummaryDisplay}`,
+    },
+    { label: "Certificate Validity", valueHtml: `${certValidityDisplay}` },
+
+    // ===== Content and security analysis =====
+    {
+      label: "Page Title",
+      valueHtml: `${
+        metadata.contentInfo.title ? metadata.contentInfo.title : "N/A"
+      }`,
+    },
+    { label: "Language", valueHtml: `${languageDisplay}` },
+    { label: "Favicon", valueHtml: `${metadata.contentInfo.favicon || "N/A"}` },
+    {
+      label: "Favicon Hash",
+      valueHtml: `${metadata.contentInfo.faviconHash || "N/A"}`,
+    },
+    {
+      label: "SHA256",
+      valueHtml: `<span class="mono">${
+        metadata.contentInfo.sha256 || "N/A"
+      }</span>`,
+    },
+    {
+      label: "MD5",
+      valueHtml: `<span class="mono">${
+        metadata.contentInfo.md5 || "N/A"
+      }</span>`,
+    },
+    {
+      label: "MIME Type",
+      valueHtml: `${metadata.contentInfo.mimeType || "N/A"}`,
+    },
+    {
+      label: "Content Entropy",
+      valueHtml: `${
+        metadata.contentInfo.contentEntropy
+          ? metadata.contentInfo.contentEntropy.toFixed(2)
+          : "N/A"
+      }`,
+    },
+
+    // ===== Detection and threat info =====
+    {
+      label: "Malicious",
+      valueHtml: `<span class="detection-count ${
+        metadata.detectionStats.malicious > 0 ? "detection-danger" : ""
+      }">${metadata.detectionStats.malicious}</span>/${
+        metadata.detectionStats.total
+      } engines`,
+    },
+    {
+      label: "Suspicious",
+      valueHtml: `<span class="detection-count ${
+        metadata.detectionStats.suspicious > 2 ? "detection-warning" : ""
+      }">${metadata.detectionStats.suspicious}</span>/${
+        metadata.detectionStats.total
+      } engines`,
+    },
+    {
+      label: "Harmless",
+      valueHtml: `${metadata.detectionStats.harmless}/${metadata.detectionStats.total} engines`,
+    },
+    {
+      label: "Undetected",
+      valueHtml: `${metadata.detectionStats.undetected}/${metadata.detectionStats.total} engines`,
+    },
+    {
+      label: "Threat Categories",
+      valueHtml: `${
+        metadata.threatCategories?.length
+          ? metadata.threatCategories.join(", ")
+          : "N/A"
+      }`,
+    },
+    {
+      label: "Malware Families",
+      valueHtml: `${
+        metadata.malwareFamily?.length
+          ? metadata.malwareFamily.join(", ")
+          : "N/A"
+      }`,
+    },
+    {
+      label: "Impersonated Brand",
+      valueHtml: `${metadata.impersonatedBrand || "N/A"}`,
+    },
+    {
+      label: "Suspicious Features",
+      valueHtml: `${
+        metadata.suspiciousFeatures && metadata.suspiciousFeatures.length > 0
+          ? metadata.suspiciousFeatures.join(", ")
+          : "N/A"
+      }`,
+    },
+
+    // ===== External resources and links =====
+    {
+      label: "Linked Domains",
+      valueHtml: `${metadata.externalResources.linkedDomains?.length || 0}`,
+    },
+    {
+      label: "Embedded URLs",
+      valueHtml: `${metadata.externalResources.embeddedUrls?.length || 0}`,
+    },
+    {
+      label: "External Scripts",
+      valueHtml: `${metadata.externalResources.externalScripts?.length || 0}`,
+    },
+    {
+      label: "Trackers",
+      valueHtml: `${metadata.externalResources.trackers?.length || 0}`,
+    },
+
+    // ===== Behavioral indicators =====
+    {
+      label: "JavaScript Activity",
+      valueHtml: `${jsActivityValue} <span class="${statusClass(
+        jsActivityStatus
+      )}">(${jsActivityStatus})</span>`,
+    },
+    { label: "JS Activity Status", valueHtml: `${jsActivityStatus}` },
+    {
+      label: "Suspicious Redirects",
+      valueHtml: `${metadata.behaviorInfo.suspiciousRedirects ? "Yes" : "No"}`,
+    },
+    {
+      label: "Data URI Usage",
+      valueHtml: `${metadata.behaviorInfo.dataUriUsage ? "Detected" : "None"}`,
+    },
+    {
+      label: "Hidden Elements",
+      valueHtml: `${
+        metadata.behaviorInfo.hiddenElements ? "Detected" : "None"
+      }`,
+    },
+
+    // ===== Passive DNS and historical data =====
+    {
+      label: "First Seen",
+      valueHtml: `${
+        metadata.passiveDns?.firstSeen
+          ? formatDate(metadata.passiveDns.firstSeen)
+          : "N/A"
+      }`,
+    },
+    {
+      label: "Last Seen",
+      valueHtml: `${
+        metadata.passiveDns?.lastSeen
+          ? formatDate(metadata.passiveDns.lastSeen)
+          : "N/A"
+      }`,
+    },
+    {
+      label: "Distinct IPs",
+      valueHtml: `${metadata.passiveDns?.distinctIps?.length ?? 0}`,
+    },
+    {
+      label: "Total Resolutions",
+      valueHtml: `${metadata.passiveDns?.totalResolutions ?? 0}`,
+    },
+  ];
+
+  const itemsHtml = items
+    .map(
+      (it, idx) => `
+      <div class="result-item">
+        <span class="result-label">${idx + 1}. ${it.label}:</span>
+        <span class="result-value">${it.valueHtml}</span>
+      </div>`
+    )
+    .join("\n");
+
   results.innerHTML = `
     <div style="width: 800px; font-size: 15px;">
       <div style="margin-bottom: 12px;">
@@ -329,224 +681,7 @@ function displayComprehensiveResults(metadata: VTURLMetadata): void {
       </div>
 
       <div class="result-section">
-        <div class="result-item">
-          <span class="result-label">1. Original URL:</span>
-          <span class="result-value">${metadata.url}</span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">2. Final URL:</span>
-          <span class="result-value">${finalUrlDisplay}</span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">3. Hostname:</span> ${
-            metadata.hostname || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">4. Redirects:</span> ${
-            metadata.redirectDepth || 0
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">5. IP Address:</span> ${
-            metadata.network.ipAddress || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">6. Country:</span> ${
-            metadata.network.country || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">7. City:</span> ${
-            metadata.network.city || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">8. ASN:</span> ${
-            metadata.network.asn || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">9. AS Owner:</span> ${
-            metadata.network.asOwner || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">10. ISP:</span> ${
-            metadata.network.isp || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">11. Domain Age:</span> ${domainAge}
-        </div>
-        <div class="result-item">
-          <span class="result-label">12. Registrar:</span> ${
-            metadata.domain.registrar || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">13. Created:</span> ${
-            metadata.domain.creationDate
-              ? formatDate(metadata.domain.creationDate)
-              : "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">14. Expires:</span> ${
-            metadata.domain.expirationDate
-              ? formatDate(metadata.domain.expirationDate)
-              : "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">15. Certificate (Issuer → Subject):</span>
-          <span class="result-value">${certSummaryDisplay}</span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">16. Certificate Validity:</span>
-          <span class="result-value">${certValidityDisplay}</span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">17. Malicious:</span> 
-          <span class="detection-count ${
-            metadata.detectionStats.malicious > 0 ? "detection-danger" : ""
-          }">${metadata.detectionStats.malicious}</span>
-          /${metadata.detectionStats.total} engines
-        </div>
-        <div class="result-item">
-          <span class="result-label">18. Suspicious:</span> 
-          <span class="detection-count ${
-            metadata.detectionStats.suspicious > 2 ? "detection-warning" : ""
-          }">${metadata.detectionStats.suspicious}</span>
-          /${metadata.detectionStats.total} engines
-        </div>
-        <div class="result-item">
-          <span class="result-label">19. VT Votes:</span>
-          ${
-            metadata.votes
-              ? `${metadata.votes.harmless ?? 0} harmless / ${
-                  metadata.votes.malicious ?? 0
-                } malicious`
-              : "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">20. Impersonated Brand:</span> ${
-            metadata.impersonatedBrand || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">21. Suspicious Features:</span>
-          <span class="result-value">${
-            metadata.suspiciousFeatures &&
-            metadata.suspiciousFeatures.length > 0
-              ? metadata.suspiciousFeatures.join(", ")
-              : "N/A"
-          }</span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">22. Reputation Score:</span> ${
-            metadata.reputation !== undefined ? metadata.reputation : "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">23. Status Code:</span> ${
-            metadata.httpInfo.statusCode || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">24. HSTS:</span>
-          <span class="result-value"><span class="${statusClass(
-            hstsStatus
-          )}">${hstsStatus}</span></span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">25. Content Type:</span> ${
-            metadata.httpInfo.contentType || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">26. Server:</span> ${
-            metadata.httpInfo.serverInfo || "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">27. Content Length:</span> ${
-            metadata.httpInfo.contentLength
-              ? formatBytes(metadata.httpInfo.contentLength)
-              : "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">28. Page Title:</span>
-          <span class="result-value">${
-            metadata.contentInfo.title ? metadata.contentInfo.title : "N/A"
-          }</span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">29. Language:</span> ${languageDisplay}
-        </div>
-        <div class="result-item">
-          <span class="result-label">30. SHA256:</span>
-          <span class="result-value mono">${
-            metadata.contentInfo.sha256 || "N/A"
-          }</span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">31. Content Entropy:</span> ${
-            metadata.contentInfo.contentEntropy
-              ? metadata.contentInfo.contentEntropy.toFixed(2)
-              : "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">32. Linked Domains:</span> ${
-            metadata.externalResources.linkedDomains?.length || 0
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">33. Embedded URLs:</span> ${
-            metadata.externalResources.embeddedUrls?.length || 0
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">34. Trackers:</span> ${
-            metadata.externalResources.trackers?.length || 0
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">35. JavaScript Activity:</span>
-          <span class="result-value">${jsActivityValue} <span class="${statusClass(
-    jsActivityStatus
-  )}">(${jsActivityStatus})</span></span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">36. Suspicious Redirects:</span> ${
-            metadata.behaviorInfo.suspiciousRedirects ? "Yes" : "No"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">37. Data URI Usage:</span> ${
-            metadata.behaviorInfo.dataUriUsage ? "Detected" : "None"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">38. Scan Date:</span> ${formatDate(
-            metadata.scanDate
-          )}
-        </div>
-        <div class="result-item">
-          <span class="result-label">39. First Seen:</span> ${
-            metadata.passiveDns?.firstSeen
-              ? formatDate(metadata.passiveDns.firstSeen)
-              : "N/A"
-          }
-        </div>
-        <div class="result-item">
-          <span class="result-label">40. Scan ID:</span>
-          <span class="result-value mono">${metadata.scanId || "N/A"}</span>
-        </div>
+        ${itemsHtml}
       </div>
     </div>
   `;
