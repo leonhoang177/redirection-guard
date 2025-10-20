@@ -1,0 +1,13 @@
+{
+  "devDependencies": {
+    "@types/node": "^24.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "tsx": "^4.19.2"
+  },
+  "type": "module",
+  "scripts": {
+    "scan": "tsx scan.tsx",
+    "scan:url": "tsx scan.tsx https://apple.com"
+  }
+}
