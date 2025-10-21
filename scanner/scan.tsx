@@ -1,3 +1,14 @@
+// Debug flag and logger
+const DEBUG = process.argv.includes("--debug");
+function dlog(...args: any[]) {
+  if (DEBUG) console.log("[debug]", ...args);
+}
+
+// Predicate to detect premium/forbidden errors
+function isForbidden(err: any): boolean {
+  const msg = String(err?.message || err || "");
+  return msg.includes("403") || msg.toLowerCase().includes("forbidden");
+}
 // Enhanced VirusTotal API Response Types with comprehensive metadata
 export interface VTURLMetadata {
   // Metadata
@@ -9,8 +20,10 @@ export interface VTURLMetadata {
   hostname: string;
   path: string;
   finalUrl?: string;
+  urlEntropy?: number;
   redirectChain?: string[];
   redirectDepth: number;
+  redirectEntropy?: number;
 
   // Domain info
   domain: {
@@ -34,13 +47,11 @@ export interface VTURLMetadata {
 
   // HTTP response info
   httpInfo: {
-    statusCode?: number;
-    responseTime?: number;
     headers?: Record<string, string>;
+    statusCode?: number;
     contentType?: string;
     contentLength?: number;
     serverInfo?: string;
-    /** Whether HSTS is present via the Strict-Transport-Security header */
     hsts?: boolean;
   };
 
@@ -55,12 +66,6 @@ export interface VTURLMetadata {
     fingerprint?: string;
   };
 
-  /** Vendor votes summary (VirusTotal attributes.total_votes) */
-  votes?: {
-    harmless: number;
-    malicious: number;
-  };
-
   /** Parsed TLS certificate summary (from attributes.last_https_certificate) */
   certificateInfo?: {
     issuerCN?: string;
@@ -73,17 +78,13 @@ export interface VTURLMetadata {
   // Content and security analysis
   contentInfo: {
     title?: string;
-    language?: string;
     favicon?: string;
-    faviconHash?: string;
     sha256?: string;
-    md5?: string;
-    mimeType?: string;
     contentEntropy?: number;
   };
 
   // Detection and threat info
-  detectionStats: DetectionStats;
+  detectionVotes: DetectionStats;
   threatCategories?: string[];
   malwareFamily?: string[];
   impersonatedBrand?: string;
@@ -99,12 +100,7 @@ export interface VTURLMetadata {
 
   // Behavioral indicators
   behaviorInfo: {
-    /** Whether JavaScript activity was detected (true/false), or null if undetermined */
-    javascriptActivityDetected?: boolean | null;
-
-    /** Status flag for JS activity (preferred for ML/export) */
-    javascriptActivityStatus?: StatusFlag;
-    suspiciousRedirects?: boolean;
+    javascriptActivity?: boolean | null;
     dataUriUsage?: boolean;
     hiddenElements?: boolean;
   };
@@ -118,19 +114,11 @@ export interface VTURLMetadata {
   };
 }
 
-export interface ContactInfo {
-  name?: string;
-  organization?: string;
-  email?: string;
-  country?: string;
-}
-
 export interface DetectionStats {
   malicious: number;
   suspicious: number;
   harmless: number;
   undetected: number;
-  total: number;
 }
 
 // VirusTotal API Response interfaces
@@ -148,25 +136,6 @@ export interface VTURLResponse {
 }
 
 export interface VTURLAttributes {
-  // Analysis results
-  last_analysis_stats: {
-    malicious: number;
-    suspicious: number;
-    harmless: number;
-    undetected: number;
-    timeout: number;
-  };
-  last_analysis_results?: Record<
-    string,
-    {
-      category: string;
-      engine_name: string;
-      engine_version: string;
-      result: string;
-      method: string;
-    }
-  >;
-
   // HTTP info
   last_http_response_code?: number;
   last_http_response_headers?: Record<string, string>;
@@ -181,12 +150,6 @@ export interface VTURLAttributes {
   // Content info
   title?: string;
   favicon?: string;
-  html_meta?: {
-    description?: string[];
-    keywords?: string[];
-    language?: string;
-    author?: string[];
-  };
 
   // Categories and tags
   categories?: Record<string, string>;
@@ -293,33 +256,6 @@ export interface GeoIPResponse {
   organization?: string;
   as?: string;
   asname?: string;
-}
-
-// ===== Flat training row schema (value + status) =====
-export type StatusFlag = "ok" | "not_present" | "unknown" | "error";
-
-// Flat CSV-friendly row used for model training
-export interface FlatScanRow {
-  url: string;
-  redirect_depth: number | null;
-
-  javascript_activity_detected: 0 | 1 | null;
-  javascript_activity_status: StatusFlag;
-
-  hsts: 0 | 1 | null;
-  hsts_status: StatusFlag;
-
-  status_code: number | null;
-  status_code_status: StatusFlag;
-
-  vt_votes_harmless: number | null;
-  vt_votes_malicious: number | null;
-  vt_votes_status: StatusFlag;
-
-  tls_valid_days: number | null;
-  tls_valid_days_status: StatusFlag;
-
-  reputation_score: number | null;
 }
 
 // ===== scanner.tsx (kept in full) =====
@@ -453,14 +389,22 @@ async function fetchDomainInfo(hostname: string) {
         (now - attr.creation_date * 1000) / (1000 * 60 * 60 * 24)
       );
     }
-    return { registrar, creationDate, expirationDate, domainAge };
+    const lastHttpsCert = (attr as any)?.last_https_certificate;
+    return {
+      registrar,
+      creationDate,
+      expirationDate,
+      domainAge,
+      _lastHttpsCert: lastHttpsCert,
+    } as any;
   } catch {
     return {
       registrar: ERROR,
       creationDate: ERROR,
       expirationDate: ERROR,
       domainAge: ERROR,
-    };
+      _lastHttpsCert: undefined,
+    } as any;
   }
 }
 
@@ -492,6 +436,288 @@ async function fetchIPInfo(ip: string): Promise<VTURLMetadata["network"]> {
   }
 }
 
+// Helper: fetch a certificate from VT relationships as a fallback
+async function fetchCertificateFromRelationships(
+  hostname: string,
+  ip?: string
+) {
+  // helper to resolve first cert from a relationships response
+  const resolveFirst = async (rel: any) => {
+    const first = rel?.data?.[0];
+    if (!first) return undefined;
+    if (first.attributes) return first.attributes; // attributes inlined
+    if (first.id) {
+      const cert = await vtGet(`/ssl_certificates/${first.id}`);
+      return cert?.data?.attributes;
+    }
+    return undefined;
+  };
+  try {
+    if (ip) {
+      const rel = await vtGet(
+        `/ip_addresses/${ip}/relationships/ssl_certificates?limit=1`
+      );
+      const attrs = await resolveFirst(rel);
+      if (attrs) return attrs;
+    }
+  } catch {}
+  try {
+    const rel = await vtGet(
+      `/domains/${hostname}/relationships/ssl_certificates?limit=1`
+    );
+    const attrs = await resolveFirst(rel);
+    if (attrs) return attrs;
+  } catch {}
+  return undefined;
+}
+
+// Try to fetch a certificate by id or reference object
+async function fetchCertificateById(ref: any) {
+  try {
+    const id =
+      typeof ref === "string"
+        ? ref
+        : ref?.id ||
+          ref?.certificate_id ||
+          ref?.sha256 ||
+          ref?.sha1 ||
+          undefined;
+    if (!id) return undefined;
+    const cert = await vtGet(`/ssl_certificates/${id}`);
+    return cert?.data?.attributes;
+  } catch (e) {
+    return undefined;
+  }
+}
+
+function parseCNFromDN(dn: any): string | undefined {
+  if (!dn) return undefined;
+  if (typeof dn === "object") {
+    return dn.CN || dn.cn || dn.commonName || dn.common_name || undefined;
+  }
+  if (typeof dn === "string") {
+    const parts = dn.split(/,\s*/);
+    for (const p of parts) {
+      const m = p.match(/^CN\s*=\s*(.+)$/i);
+      if (m) return m[1].trim();
+    }
+  }
+  return undefined;
+}
+
+// Parse RFC5988 Link header to find rel=icon (favicon), resolving relative URLs as needed
+function extractIconFromLinkHeader(
+  linkHeader?: string,
+  base?: string
+): string | undefined {
+  if (!linkHeader) return undefined;
+  // split on commas not inside quotes
+  const parts = linkHeader
+    .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
+    .map((p) => p.trim());
+  for (const p of parts) {
+    const urlMatch = p.match(/<([^>]+)>/);
+    if (!urlMatch) continue;
+    const params = Object.fromEntries(
+      p
+        .slice(urlMatch.index! + urlMatch[0].length)
+        .split(";")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((kv) => {
+          const [k, v] = kv.split("=");
+          return [
+            k.toLowerCase(),
+            v ? v.replace(/^"|"$/g, "").toLowerCase() : "",
+          ];
+        })
+    );
+    const rel = params["rel"] || "";
+    if (rel.includes("icon") || rel.includes("shortcut icon")) {
+      try {
+        return base ? new URL(urlMatch[1], base).toString() : urlMatch[1];
+      } catch {
+        return urlMatch[1];
+      }
+    }
+  }
+  return undefined;
+}
+
+// Normalized Shannon entropy (bits per character), independent of length
+function normalizedEntropy(s: string): number {
+  if (!s || !s.length) return 0;
+  const freq: Record<string, number> = {};
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    freq[ch] = (freq[ch] || 0) + 1;
+  }
+  let H = 0;
+  const n = s.length;
+  for (const k in freq) {
+    const p = freq[k] / n;
+    H -= p * Math.log2(p);
+  }
+  return +H.toFixed(4); // bits/char
+}
+
+// Heuristic parser for response-time style headers (ms)
+function parseDurationToMs(raw: string): number | undefined {
+  if (!raw) return undefined;
+  const s = String(raw).trim();
+  // cases: "123ms", "0.123s", "123", "0.123"
+  const msMatch = s.match(/^([0-9]*\.?[0-9]+)\s*ms$/i);
+  if (msMatch) return Math.round(parseFloat(msMatch[1]));
+  const sMatch = s.match(/^([0-9]*\.?[0-9]+)\s*s(ec|econds?)?$/i);
+  if (sMatch) return Math.round(parseFloat(sMatch[1]) * 1000);
+  // no unit: decide by magnitude — < 20 → seconds, else ms
+  const num = parseFloat(s);
+  if (!Number.isNaN(num)) {
+    if (num < 20) return Math.round(num * 1000); // assume seconds
+    return Math.round(num); // assume ms
+  }
+  return undefined;
+}
+
+function parseServerTiming(header: string | undefined): number | undefined {
+  if (!header) return undefined;
+  // Example: "cache;desc=HIT, edge;dur=1, origin;dur=45"
+  // We pick the largest dur as a conservative page time (ms)
+  const parts = header.split(/,(?![^\(]*\))/g).map((p) => p.trim());
+  let best: number | undefined = undefined;
+  for (const p of parts) {
+    const m = p.match(/dur\s*=\s*([0-9]*\.?[0-9]+)/i);
+    if (m) {
+      const ms = Math.round(parseFloat(m[1]));
+      if (!Number.isNaN(ms)) best = Math.max(best ?? 0, ms);
+    }
+  }
+  return best;
+}
+
+// Helper: fetch a certificate from VT URL relationships as a fallback
+async function fetchCertificateFromUrlRelationships(urlId: string) {
+  try {
+    const rel = await vtGet(
+      `/urls/${urlId}/relationships/ssl_certificates?limit=1`
+    );
+    const first = rel?.data?.[0];
+    if (!first) return undefined;
+    if (first.attributes) return first.attributes;
+    if (first.id) {
+      const cert = await vtGet(`/ssl_certificates/${first.id}`);
+      return cert?.data?.attributes;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Fetch contacted IPs from URL relationships (to try IP->cert path)
+async function fetchContactedIPsFromUrl(urlId: string): Promise<string[]> {
+  try {
+    const rel = await vtGet(
+      `/urls/${urlId}/relationships/contacted_ips?limit=10`
+    );
+    const items = rel?.data || [];
+    return items.map((x: any) => x?.id).filter(Boolean);
+  } catch (e: any) {
+    dlog("contacted_ips rel fetch failed:", e?.message || String(e));
+    return [];
+  }
+}
+
+// Try toggling www. variant of hostname to increase hit rate
+function toggleWww(host: string): string {
+  if (host.startsWith("www.")) return host.slice(4);
+  return `www.${host}`;
+}
+
+// ---- Passive DNS helpers ----
+function toISODate(value: any): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "number") {
+    // VT usually returns seconds for these endpoints
+    const ms = value > 1e12 ? value : value * 1000;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+  }
+  if (typeof value === "string") {
+    const t = Date.parse(value);
+    if (!Number.isNaN(t)) return new Date(t).toISOString();
+  }
+  return undefined;
+}
+
+async function fetchPassiveDnsForDomain(hostname: string) {
+  try {
+    // Prefer the documented /resolutions resource; limit to a sane page
+    const resp = await vtGet(`/domains/${hostname}/resolutions?limit=40`);
+    const rows = Array.isArray(resp?.data) ? resp.data : [];
+    const ips: string[] = [];
+    let first: number | undefined;
+    let last: number | undefined;
+
+    for (const r of rows) {
+      const a = r?.attributes || {};
+      const ip = a.ip_address || r?.id; // VT often places IP in attributes
+      if (ip && !ips.includes(ip)) ips.push(ip);
+
+      const when = a.date || a.last_resolved || a.first_seen || a.last_seen;
+      if (typeof when === "number") {
+        if (first === undefined || when < first) first = when;
+        if (last === undefined || when > last) last = when;
+      }
+    }
+
+    return {
+      distinctIps: ips,
+      totalResolutions: rows.length,
+      firstSeen: toISODate(first),
+      lastSeen: toISODate(last),
+    } as VTURLMetadata["passiveDns"];
+  } catch (e) {
+    dlog(
+      "passive DNS (domain) fetch failed:",
+      (e as any)?.message || String(e)
+    );
+    return undefined;
+  }
+}
+
+async function fetchPassiveDnsForIP(ip: string) {
+  try {
+    const resp = await vtGet(`/ip_addresses/${ip}/resolutions?limit=40`);
+    const rows = Array.isArray(resp?.data) ? resp.data : [];
+    const hosts: string[] = [];
+    let first: number | undefined;
+    let last: number | undefined;
+
+    for (const r of rows) {
+      const a = r?.attributes || {};
+      const host = a.host_name || r?.id; // VT often places hostname in attributes
+      if (host && !hosts.includes(host)) hosts.push(host);
+
+      const when = a.date || a.last_resolved || a.first_seen || a.last_seen;
+      if (typeof when === "number") {
+        if (first === undefined || when < first) first = when;
+        if (last === undefined || when > last) last = when;
+      }
+    }
+
+    return {
+      distinctIps: undefined, // this call returns hostnames, not IPs
+      totalResolutions: rows.length,
+      firstSeen: toISODate(first),
+      lastSeen: toISODate(last),
+    } as VTURLMetadata["passiveDns"];
+  } catch (e) {
+    dlog("passive DNS (ip) fetch failed:", (e as any)?.message || String(e));
+    return undefined;
+  }
+}
+
 async function buildVTMetadata(
   targetUrl: string,
   vtUrlPayload: any
@@ -502,6 +728,7 @@ async function buildVTMetadata(
   const path = urlObj.pathname + urlObj.search + urlObj.hash;
 
   const attr = vtUrlPayload?.data?.attributes ?? {};
+  dlog("attr keys:", Object.keys(attr));
 
   // HTTP Info
   const headers = attr.last_http_response_headers ?? {};
@@ -512,12 +739,8 @@ async function buildVTMetadata(
     );
 
   const httpInfo = {
+    headers: headers,
     statusCode: attr.last_http_response_code ?? undefined,
-    responseTime: undefined,
-    headers,
-    contentType: headers
-      ? headers["content-type"] ?? headers["Content-Type"] ?? undefined
-      : undefined,
     contentLength: attr.last_http_response_content_length ?? undefined,
     serverInfo: headers
       ? headers["server"] ?? headers["Server"] ?? undefined
@@ -525,37 +748,157 @@ async function buildVTMetadata(
     hsts: hsts || false,
   };
 
-  // Content Info
+  // Redirect info (define early so contentInfo/behaviorInfo can use it)
+  const finalUrl = attr.last_final_url ?? undefined;
+  const redirectChain: string[] = Array.isArray(attr.redirection_chain)
+    ? attr.redirection_chain
+    : [];
+  const redirectDepth = redirectChain.length;
+
+  // Content Info (with fallbacks)
+  // Best-effort content entropy without fetching body:
+  // 1) last_http_response_content_sha256, 2) title, 3) ETag, 4) URL chain
+  let entropySource: string | undefined = undefined;
+  if (attr.last_http_response_content_sha256) {
+    entropySource = attr.last_http_response_content_sha256;
+  } else if (typeof attr.title === "string" && attr.title.trim()) {
+    entropySource = attr.title.trim();
+  } else if (typeof headers?.["etag"] === "string") {
+    entropySource = String(headers["etag"]);
+  } else if (typeof headers?.["ETag"] === "string") {
+    entropySource = String(headers["ETag"]);
+  } else {
+    entropySource = [finalUrl || url, ...redirectChain].join("|");
+  }
+  const contentEntropy = normalizedEntropy(entropySource || "");
+
+  // Favicon URL: VT sometimes stores a URL, otherwise try Link header, else heuristic /favicon.ico
+  let favicon: string | undefined = attr.favicon ?? undefined;
+  if (!favicon) {
+    const linkHeader = (headers?.["link"] || headers?.["Link"]) as
+      | string
+      | undefined;
+    const iconFromLink = extractIconFromLinkHeader(linkHeader, finalUrl || url);
+    if (iconFromLink) favicon = iconFromLink;
+  }
+  if (!favicon) {
+    try {
+      // Heuristic only; does not fetch, just fills a reasonable default
+      const base = new URL(finalUrl || url);
+      favicon = `${base.protocol}//${base.host}/favicon.ico`;
+    } catch {}
+  }
+
+  // Entropy features
+  // urlEntropy: normalized entropy of the PROVIDED URL only
+  const urlEntropy = normalizedEntropy(url);
+
+  // redirectEntropy: normalized entropy of the concatenated redirection URLs only
+  const redirectEntropy = normalizedEntropy(redirectChain.join("|"));
+
   const contentInfo = {
     title: attr.title ?? undefined,
-    language: attr.html_meta?.language ?? undefined,
-    favicon: attr.favicon ?? undefined,
-    faviconHash: undefined,
+    favicon,
     sha256: attr.last_http_response_content_sha256 ?? undefined,
-    md5: undefined,
-    mimeType: httpInfo.contentType,
-    contentEntropy: undefined,
+    contentEntropy,
   };
 
-  // Votes
-  const votes = attr.total_votes
-    ? {
-        harmless: attr.total_votes.harmless ?? 0,
-        malicious: attr.total_votes.malicious ?? 0,
-      }
-    : undefined;
+  // Certificate Info: multiple strategies
+  let certAttributes: any | undefined = undefined;
 
-  // Certificate Info
-  const cert = attr.last_https_certificate;
-  const certificateInfo = cert
-    ? {
-        issuerCN: cert.issuer?.CN,
-        subjectCN: cert.subject?.CN,
-        notBefore: cert.validity?.not_before,
-        notAfter: cert.validity?.not_after,
-        serialNumber: cert.serial_number,
+  // 1) Directly from URL attributes (some keys carry inline attributes, others only an id)
+  dlog("try direct last_https_certificate:", !!attr.last_https_certificate);
+  if (attr.last_https_certificate) {
+    if (
+      attr.last_https_certificate.issuer ||
+      attr.last_https_certificate.subject
+    ) {
+      certAttributes = attr.last_https_certificate;
+    } else {
+      const deref = await fetchCertificateById(attr.last_https_certificate);
+      if (deref) certAttributes = deref;
+    }
+  }
+
+  // 2) Fallback: try relationships from IP, then domain
+  dlog("try relationships: domain/ip", hostname, attr.last_serving_ip_address);
+  if (!certAttributes) {
+    const relAttr = await fetchCertificateFromRelationships(
+      hostname,
+      attr.last_serving_ip_address
+    );
+    if (relAttr) certAttributes = relAttr;
+  }
+
+  // 3) If finalUrl has a different hostname, try that too
+  if (!certAttributes && attr.last_final_url) {
+    try {
+      const finalHost = new URL(attr.last_final_url).hostname;
+      dlog("try relationships: finalHost", finalHost);
+      if (finalHost && finalHost !== hostname) {
+        const relAttr2 = await fetchCertificateFromRelationships(
+          finalHost,
+          undefined
+        );
+        if (relAttr2) certAttributes = relAttr2;
       }
-    : undefined;
+    } catch {}
+  }
+
+  // 4) Additional fallback: try URL relationships
+  if (!certAttributes) {
+    try {
+      dlog("try url relationships: ssl_certificates for urlId");
+      const urlId = encodeVTUrl(targetUrl);
+      const relAttr3 = await fetchCertificateFromUrlRelationships(urlId);
+      if (relAttr3) certAttributes = relAttr3;
+    } catch {}
+  }
+
+  // 5) Try contacted IPs from URL relationships then IP->cert
+  if (!certAttributes) {
+    try {
+      const urlId = encodeVTUrl(targetUrl);
+      const ips = await fetchContactedIPsFromUrl(urlId);
+      dlog("contacted_ips from URL:", ips);
+      for (const ip of ips) {
+        const rel = await vtGet(
+          `/ip_addresses/${ip}/relationships/ssl_certificates?limit=1`
+        );
+        const first = rel?.data?.[0]?.attributes;
+        if (first) {
+          certAttributes = first;
+          break;
+        }
+      }
+    } catch (e: any) {
+      if (!isForbidden(e))
+        dlog("contacted_ips->cert lookup failed:", e?.message || String(e));
+    }
+  }
+
+  // 6) Try toggling www. variant of hostname
+  if (!certAttributes) {
+    const altHost = toggleWww(hostname);
+    if (altHost !== hostname) {
+      try {
+        const relAlt = await fetchCertificateFromRelationships(
+          altHost,
+          undefined
+        );
+        if (relAlt) certAttributes = relAlt;
+      } catch (e: any) {
+        if (!isForbidden(e))
+          dlog("alt host rel fetch failed:", e?.message || String(e));
+      }
+    }
+  }
+
+  dlog(
+    "certAttributes present:",
+    !!certAttributes,
+    certAttributes && Object.keys(certAttributes)
+  );
 
   // Detection Stats
   const lastStats = attr.last_analysis_stats ?? {};
@@ -565,12 +908,11 @@ async function buildVTMetadata(
   const undetected = lastStats.undetected ?? 0;
   const total = malicious + suspicious + harmless + undetected;
 
-  const detectionStats: DetectionStats = {
+  const detectionVotes: DetectionStats = {
     malicious,
     suspicious,
     harmless,
     undetected,
-    total,
   };
 
   // Threat info
@@ -604,19 +946,67 @@ async function buildVTMetadata(
     trackers,
   };
 
-  // Behavior Info - no live JS analysis in VT URL attributes
+  // Behavior Info — derive basic booleans from VT attributes
+  const ctLower = (
+    headers?.["content-type"] ||
+    headers?.["Content-Type"] ||
+    ""
+  ).toLowerCase();
+  const javascriptActivity = Boolean(
+    ctLower.includes("javascript") ||
+      ctLower.includes("json") ||
+      (Array.isArray(trackers) && trackers.length > 0)
+  );
+
+  const redirectHosts = redirectChain
+    .map((u: string) => {
+      try {
+        return new URL(u).hostname.toLowerCase();
+      } catch {
+        return null;
+      }
+    })
+    .filter((h: string | null): h is string => Boolean(h));
+  const distinctRedirectHosts = new Set(redirectHosts).size;
+  const dataUriUsage = Array.isArray(embeddedUrls)
+    ? embeddedUrls.some(
+        (u: string) => typeof u === "string" && u.startsWith("data:")
+      )
+    : false;
+
+  // "hiddenElements" cannot be observed from VT URL fetches (no DOM). Default to false.
+  const hiddenElements = false;
+
   const behaviorInfo = {
-    javascriptActivityDetected: null,
-    javascriptActivityStatus: "not_present" as StatusFlag,
-    suspiciousRedirects: undefined,
-    dataUriUsage: undefined,
-    hiddenElements: undefined,
+    javascriptActivity,
+    dataUriUsage,
+    hiddenElements,
   };
 
-  // Redirect info
-  const finalUrl = attr.last_final_url ?? undefined;
-  const redirectChain = attr.redirection_chain ?? undefined;
-  const redirectDepth = redirectChain ? redirectChain.length : 0;
+  // Passive DNS
+  let passiveDns: VTURLMetadata["passiveDns"] | undefined = undefined;
+  try {
+    const pdDomain = await fetchPassiveDnsForDomain(hostname);
+    if (
+      pdDomain &&
+      (pdDomain.firstSeen ||
+        pdDomain.lastSeen ||
+        (pdDomain.distinctIps && pdDomain.distinctIps.length))
+    ) {
+      passiveDns = pdDomain;
+    }
+  } catch {}
+
+  // Optionally complement with IP-side resolutions if we have the serving IP
+  try {
+    const ipForDns = attr.last_serving_ip_address;
+    if (!passiveDns && ipForDns) {
+      const pdIp = await fetchPassiveDnsForIP(ipForDns);
+      if (pdIp && (pdIp.firstSeen || pdIp.lastSeen || pdIp.totalResolutions)) {
+        passiveDns = pdIp;
+      }
+    }
+  } catch {}
 
   // Network info
   let network: VTURLMetadata["network"] = {};
@@ -626,6 +1016,149 @@ async function buildVTMetadata(
 
   // Domain info
   const domain = await fetchDomainInfo(hostname);
+  dlog(
+    "domain _lastHttpsCert present:",
+    Boolean((domain as any)?._lastHttpsCert)
+  );
+
+  // 0) Prefer VT domain attributes last_https_certificate when available (after domain is fetched)
+  try {
+    const domainLastCert = (domain as any)?._lastHttpsCert;
+    if (!certAttributes && domainLastCert) {
+      if (domainLastCert.issuer || domainLastCert.subject) {
+        certAttributes = domainLastCert;
+      } else {
+        const deref = await fetchCertificateById(domainLastCert);
+        if (deref) certAttributes = deref;
+      }
+    }
+  } catch {}
+
+  // Normalize to certificateInfo shape (after all attempts)
+  let certificateInfo: VTURLMetadata["certificateInfo"] = undefined;
+  if (certAttributes) {
+    const issuerCN =
+      parseCNFromDN(certAttributes.issuer) ||
+      parseCNFromDN(certAttributes.issuer_dn) ||
+      (certAttributes as any).issuer_cn;
+    const subjectCN =
+      parseCNFromDN(certAttributes.subject) ||
+      parseCNFromDN(certAttributes.subject_dn) ||
+      (certAttributes as any).subject_cn;
+
+    const nbRaw =
+      certAttributes.validity?.not_before ??
+      (certAttributes as any).not_before ??
+      (certAttributes as any).validity_not_before;
+    const naRaw =
+      certAttributes.validity?.not_after ??
+      (certAttributes as any).not_after ??
+      (certAttributes as any).validity_not_after;
+
+    const toIso = (v: any) =>
+      typeof v === "number" ? new Date(v * 1000).toISOString() : v;
+
+    certificateInfo = {
+      issuerCN: issuerCN,
+      subjectCN: subjectCN,
+      notBefore: toIso(nbRaw),
+      notAfter: toIso(naRaw),
+      serialNumber:
+        (certAttributes as any).serial_number ||
+        (certAttributes as any).serialNumber ||
+        (certAttributes as any).serial ||
+        undefined,
+    };
+    dlog("certificateInfo:", certificateInfo);
+  }
+
+  // Build tlsInfo (full certificate view) from certAttributes if available
+  let tlsInfo: VTURLMetadata["tlsInfo"] | undefined = undefined;
+  if (certAttributes) {
+    const issuerObj =
+      (certAttributes as any).issuer ?? (certAttributes as any).issuer_dn;
+    const subjectObj =
+      (certAttributes as any).subject ?? (certAttributes as any).subject_dn;
+
+    const issuerCN =
+      parseCNFromDN(issuerObj) ||
+      (certAttributes as any).issuer_cn ||
+      undefined;
+    const subjectCN =
+      parseCNFromDN(subjectObj) ||
+      (certAttributes as any).subject_cn ||
+      undefined;
+
+    // Prefer DN strings if available, else fall back to CNs, else JSON
+    const issuerStr =
+      typeof issuerObj === "string"
+        ? issuerObj
+        : issuerCN ?? (issuerObj ? JSON.stringify(issuerObj) : undefined);
+
+    const subjectStr =
+      typeof subjectObj === "string"
+        ? subjectObj
+        : subjectCN ?? (subjectObj ? JSON.stringify(subjectObj) : undefined);
+
+    const nbRaw =
+      (certAttributes as any).validity?.not_before ??
+      (certAttributes as any).not_before ??
+      (certAttributes as any).validity_not_before;
+    const naRaw =
+      (certAttributes as any).validity?.not_after ??
+      (certAttributes as any).not_after ??
+      (certAttributes as any).validity_not_after;
+
+    const toIso = (v: any) =>
+      typeof v === "number" ? new Date(v * 1000).toISOString() : v;
+
+    // SAN extraction: VT may provide as string or array under different keys
+    let sanEntries: string[] | undefined = undefined;
+    const sanSrc =
+      (certAttributes as any).extensions?.subject_alternative_name ??
+      (certAttributes as any).subject_alternative_name ??
+      (certAttributes as any).subject_alt_name ??
+      (certAttributes as any).san;
+    if (Array.isArray(sanSrc)) {
+      sanEntries = sanSrc.map((s: any) => String(s)).filter(Boolean);
+    } else if (typeof sanSrc === "string") {
+      // Common format: "DNS:example.com, DNS:www.example.com"
+      sanEntries = sanSrc
+        .split(/,\s*/)
+        .map((s: string) => s.replace(/^DNS:/i, "").trim())
+        .filter(Boolean);
+    }
+
+    const fingerprint =
+      (certAttributes as any).thumbprint_sha256 ??
+      (certAttributes as any).thumbprint ??
+      (certAttributes as any).sha256 ??
+      (certAttributes as any).fingerprint ??
+      undefined;
+
+    const serial =
+      (certAttributes as any).serial_number ??
+      (certAttributes as any).serialNumber ??
+      (certAttributes as any).serial ??
+      undefined;
+
+    if (issuerStr && subjectStr && nbRaw && naRaw && serial) {
+      tlsInfo = {
+        issuer: issuerStr,
+        subject: subjectStr,
+        validFrom: toIso(nbRaw),
+        validTo: toIso(naRaw),
+        serialNumber: serial,
+        sanEntries,
+        fingerprint,
+      };
+      dlog("tlsInfo:", tlsInfo);
+    } else {
+      dlog(
+        "tlsInfo not fully populated (missing one of issuer/subject/validity/serial)"
+      );
+    }
+  }
 
   const metadata: VTURLMetadata = {
     scanId: vtUrlPayload?.data?.id,
@@ -635,8 +1168,10 @@ async function buildVTMetadata(
     hostname,
     path,
     finalUrl,
+    urlEntropy,
     redirectChain,
     redirectDepth,
+    redirectEntropy,
 
     domain: {
       registrar: domain.registrar,
@@ -649,15 +1184,13 @@ async function buildVTMetadata(
 
     httpInfo,
 
-    tlsInfo: undefined,
-
-    votes,
+    tlsInfo,
 
     certificateInfo,
 
     contentInfo,
 
-    detectionStats,
+    detectionVotes,
 
     threatCategories,
     malwareFamily,
@@ -668,7 +1201,7 @@ async function buildVTMetadata(
 
     behaviorInfo,
 
-    passiveDns: undefined,
+    passiveDns,
   };
 
   return metadata;
@@ -686,17 +1219,41 @@ async function run() {
   try {
     urlReport = await getUrlReport(target);
   } catch (e: any) {
-    // If no report exists, submit and poll
     console.log("No existing report found — submitting URL to VirusTotal…");
-    const initialWaitMs = 10000; // 10s initial wait
     const analysisId = await submitUrl(target);
     if (!analysisId) throw new Error("No analysis id returned by VT.");
+    dlog("submitted analysis id:", analysisId);
 
-    console.log(`Polling analysis: ${analysisId}`);
-    await pollAnalysis(analysisId, POLL_TIMEOUT_MS, POLL_INTERVAL_MS);
+    // Wait 10s, then try to fetch the URL report up to 3 attempts total.
+    const initialWaitMs = 20000;
+    const retryWaitMs = 10000;
+    const maxRetries = 2;
 
-    // After completion, fetch the URL report again
-    urlReport = await getUrlReport(target);
+    console.log(
+      `Waiting ${Math.round(initialWaitMs / 1000)}s for VT to populate data...`
+    );
+    await new Promise((r) => setTimeout(r, initialWaitMs));
+
+    let attempt = 0;
+    while (true) {
+      try {
+        urlReport = await getUrlReport(target);
+        break;
+      } catch (err) {
+        if (attempt >= maxRetries) {
+          throw new Error(
+            "Report not available yet after waiting; try again later."
+          );
+        }
+        attempt++;
+        console.log(
+          `Still preparing on VT side. Retrying in ${Math.round(
+            retryWaitMs / 1000
+          )}s (attempt ${attempt}/${maxRetries})`
+        );
+        await new Promise((r) => setTimeout(r, retryWaitMs));
+      }
+    }
   }
 
   // 2) Extract a concise, useful summary from VT payload
