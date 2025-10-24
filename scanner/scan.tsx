@@ -376,12 +376,20 @@ async function fetchDomainInfo(hostname: string) {
       );
     }
     const lastHttpsCert = (attr as any)?.last_https_certificate;
+    // Capture the first A record (if present) to use as a network fallback
+    let firstA: string | undefined;
+    const lastDns = (attr as any)?.last_dns_records;
+    if (Array.isArray(lastDns)) {
+      const a = lastDns.find((r: any) => String(r?.type).toUpperCase() === "A");
+      if (a?.value) firstA = String(a.value);
+    }
     return {
       registrar,
       creationDate,
       expirationDate,
       domainAge,
       _lastHttpsCert: lastHttpsCert,
+      _firstA: firstA,
     } as any;
   } catch {
     return {
@@ -390,6 +398,7 @@ async function fetchDomainInfo(hostname: string) {
       expirationDate: ERROR,
       domainAge: ERROR,
       _lastHttpsCert: undefined,
+      _firstA: undefined,
     } as any;
   }
 }
@@ -398,15 +407,112 @@ async function fetchIPInfo(ip: string): Promise<VTURLMetadata["network"]> {
   try {
     const ipResp: VTIPResponse = await vtGet(`/ip_addresses/${ip}`);
     const attr = ipResp?.data?.attributes ?? {};
+
+    // Start with VT-provided country; if missing, try to parse from WHOIS text
+    let country: string | undefined = attr.country || undefined;
+    let continent: string | undefined = attr.continent || undefined;
+
+    // Derive ISP/hosting from VT fields with sensible fallbacks
+    const asOwner = attr.as_owner || undefined;
+    const isp = attr.isp || asOwner || undefined;
+    const hostingProvider =
+      attr.hosting_provider || isp || asOwner || undefined;
+
+    // Best-effort city extraction from WHOIS text (VT-only, no external lookups)
+    const whoisText = typeof attr.whois === "string" ? attr.whois : undefined;
+    let city: string | undefined =
+      attr.city || extractCityFromWhoisText(whoisText);
+
+    // Extract country code/name from WHOIS if VT didn't provide it
+    if (!country && whoisText) {
+      const lines = whoisText
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+      const kv = (key: RegExp) => lines.find((ln) => key.test(ln));
+      const ctryLine =
+        kv(/^country\s*:/i) ||
+        kv(/^country-code\s*:/i) ||
+        kv(/^country code\s*:/i);
+      if (ctryLine) {
+        const val = ctryLine.split(":").slice(1).join(":").trim();
+        if (val) country = val.toUpperCase();
+      }
+    }
+
+    // Derive continent from country code if needed
+    if (!continent && country) {
+      const cc = country.toUpperCase();
+      const map: Record<string, string> = {
+        US: "NA",
+        CA: "NA",
+        MX: "NA",
+        BR: "SA",
+        AR: "SA",
+        CL: "SA",
+        CO: "SA",
+        PE: "SA",
+        GB: "EU",
+        UK: "EU",
+        IE: "EU",
+        FR: "EU",
+        DE: "EU",
+        ES: "EU",
+        IT: "EU",
+        NL: "EU",
+        BE: "EU",
+        SE: "EU",
+        NO: "EU",
+        DK: "EU",
+        FI: "EU",
+        PL: "EU",
+        PT: "EU",
+        CZ: "EU",
+        AT: "EU",
+        CH: "EU",
+        RU: "EU",
+        UA: "EU",
+        RO: "EU",
+        HU: "EU",
+        GR: "EU",
+        TR: "AS",
+        SA: "AS",
+        AE: "AS",
+        IL: "AS",
+        QA: "AS",
+        KW: "AS",
+        CN: "AS",
+        JP: "AS",
+        KR: "AS",
+        IN: "AS",
+        SG: "AS",
+        HK: "AS",
+        TW: "AS",
+        TH: "AS",
+        MY: "AS",
+        ID: "AS",
+        PH: "AS",
+        VN: "AS",
+        AU: "OC",
+        NZ: "OC",
+        ZA: "AF",
+        NG: "AF",
+        EG: "AF",
+        KE: "AF",
+        MA: "AF",
+      };
+      continent = map[cc] || undefined;
+    }
+
     return {
-      ipAddress: attr.ip_address,
+      ipAddress: attr.ip_address || ip,
       asn: attr.asn ? String(attr.asn) : undefined,
-      asOwner: attr.as_owner,
-      country: attr.country,
-      continent: attr.continent,
-      city: attr.city,
-      isp: attr.isp,
-      hostingProvider: attr.hosting_provider,
+      asOwner,
+      country,
+      continent,
+      city,
+      isp,
+      hostingProvider,
     };
   } catch {
     return {
@@ -525,6 +631,81 @@ function extractIconFromLinkHeader(
       } catch {
         return urlMatch[1];
       }
+    }
+  }
+  return undefined;
+}
+
+// ---- WHOIS city parsing helpers ----
+function looksLikeStreetAddress(s: string): boolean {
+  const str = s.toLowerCase();
+  if (
+    /(street|st\.?|road|rd\.?|avenue|ave\.?|blvd|boulevard|suite|ste\.?|floor|fl\.?|building|bldg)/i.test(
+      str
+    )
+  ) {
+    return true;
+  }
+  const digits = (str.match(/\d+/g) || []).join("");
+  if (digits.length >= 3) return true;
+  return false;
+}
+
+function cleanupCityToken(raw: string): string | undefined {
+  if (!raw) return undefined;
+  let s = raw.trim();
+  // Remove surrounding quotes
+  s = s.replace(/^"|"$/g, "");
+  // Strip leading postal codes like "22177 Hamburg", "DE-22177 Hamburg", "W1A 1HQ London"
+  const postalRe = /^(?:[A-Z]{1,3}[- ]?)?\d{3,6}\s+(.+)$/i;
+  const m1 = s.match(postalRe);
+  if (m1 && m1[1]) s = m1[1].trim();
+  // Remove trailing country names/codes
+  s = s
+    .replace(
+      /,?\s*(united states|usa|germany|de|france|fr|united kingdom|uk|italy|it|spain|es)$/i,
+      ""
+    )
+    .trim();
+  if (!s || looksLikeStreetAddress(s)) return undefined;
+  const letters = (s.match(/[a-z]/gi) || []).length;
+  const digits = (s.match(/\d/g) || []).length;
+  if (letters < 3 || digits > 2) return undefined;
+  return s;
+}
+
+function extractCityFromWhoisText(whoisText?: string): string | undefined {
+  if (!whoisText) return undefined;
+  const lines = whoisText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  // 1) Explicit keys
+  const keys = [/^city\s*:/i, /^town\s*:/i, /^location\s*:/i];
+  for (const ln of lines) {
+    for (const re of keys) {
+      if (re.test(ln)) {
+        const val = ln.split(":").slice(1).join(":").trim();
+        const cleaned = cleanupCityToken(val);
+        if (cleaned) return cleaned;
+      }
+    }
+  }
+  // 2) Address line heuristic
+  const addrLine = lines.find((l) => /^address\s*:/i.test(l));
+  if (addrLine) {
+    const v = addrLine.split(":").slice(1).join(":").trim();
+    const parts = v
+      .split(/,\s*/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+    const candidates = parts.map(cleanupCityToken).filter(Boolean) as string[];
+    if (candidates.length) {
+      candidates.sort(
+        (a, b) =>
+          a.replace(/[^a-z]/gi, "").length - b.replace(/[^a-z]/gi, "").length
+      );
+      return candidates[candidates.length - 1];
     }
   }
   return undefined;
@@ -991,18 +1172,70 @@ async function buildVTMetadata(
     }
   } catch {}
 
-  // Network info
-  let network: VTURLMetadata["network"] = {};
-  if (attr.last_serving_ip_address) {
-    network = await fetchIPInfo(attr.last_serving_ip_address);
-  }
-
-  // Domain info
+  // Domain info (moved earlier so we can use _firstA as a fallback for network)
   const domain = await fetchDomainInfo(hostname);
   dlog(
     "domain _lastHttpsCert present:",
     Boolean((domain as any)?._lastHttpsCert)
   );
+
+  // Decide serving IP using multiple fallbacks
+  let servingIp: string | undefined =
+    attr.last_serving_ip_address ||
+    headers?.["x-real-ip"] ||
+    headers?.["cf-connecting-ip"];
+
+  // Fallback 1: URL relationships → contacted_ips
+  if (!servingIp) {
+    try {
+      const urlId = encodeVTUrl(targetUrl);
+      const ips = await fetchContactedIPsFromUrl(urlId);
+      if (Array.isArray(ips) && ips.length) servingIp = ips[0];
+    } catch (e: any) {
+      if (!isForbidden(e))
+        dlog(
+          "contacted_ips as network fallback failed:",
+          e?.message || String(e)
+        );
+    }
+  }
+
+  // Fallback 2: passive DNS distinct IPs (already fetched above)
+  if (!servingIp && passiveDns?.distinctIps && passiveDns.distinctIps.length) {
+    servingIp = passiveDns.distinctIps[0];
+  }
+
+  // Fallback 3: domain first A record from last_dns_records
+  if (!servingIp) {
+    const firstA = (domain as any)?._firstA as string | undefined;
+    if (firstA) servingIp = firstA;
+  }
+
+  // Build network object with all keys present so deepMarkAbsent won't leave `{}`
+  let network: VTURLMetadata["network"] = {
+    ipAddress: undefined,
+    asn: undefined,
+    asOwner: undefined,
+    country: undefined,
+    continent: undefined,
+    city: undefined,
+    isp: undefined,
+    hostingProvider: undefined,
+  };
+
+  if (servingIp) {
+    const ipInfo = await fetchIPInfo(servingIp);
+    network = {
+      ipAddress: servingIp,
+      asn: ipInfo.asn,
+      asOwner: ipInfo.asOwner,
+      country: ipInfo.country,
+      continent: ipInfo.continent,
+      city: ipInfo.city,
+      isp: ipInfo.isp,
+      hostingProvider: ipInfo.hostingProvider,
+    };
+  }
 
   // 0) Prefer VT domain attributes last_https_certificate when available (after domain is fetched)
   try {

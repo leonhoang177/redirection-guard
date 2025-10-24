@@ -1,80 +1,92 @@
 {
-  "scanId": "73ef17550e1ef50558f0995a9edafdbd571f03f1fd8600e6fc66659e6b9fdcf4",
+  "scanId": "75d7e3196fd30edd9d6717119dc6716444d4ac67c22512373fcca9178144f6eb",
   "reputation": 0,
-  "url": "https://lista-segura.com/",
-  "hostname": "lista-segura.com",
-  "path": "/",
-  "finalUrl": "https://lista-segura.com/",
-  "urlEntropy": 3.9933,
+  "url": "https://secure-netflix.com/captcha",
+  "hostname": "secure-netflix.com",
+  "path": "/captcha",
+  "finalUrl": "https://secure-netflix.com/captcha",
+  "urlEntropy": 4.1019,
   "redirectChain": [
-    "https://lista-segura.com/"
+    "https://secure-netflix.com/captcha"
   ],
   "redirectDepth": 1,
-  "redirectEntropy": 3.9933,
+  "redirectEntropy": 4.1019,
   "domain": {
-    "registrar": "GRANSY S.R.O D/B/A SUBREG.CZ",
-    "creationDate": "2025-10-24T09:44:34.000Z",
-    "expirationDate": "2026-10-24T09:44:34.000Z",
-    "domainAge": 0
+    "registrar": "absent",
+    "creationDate": "2024-12-06T00:00:00.000Z",
+    "expirationDate": "absent",
+    "domainAge": 322
   },
-  "network": {},
+  "network": {
+    "ipAddress": "158.94.209.87",
+    "asn": "209800",
+    "asOwner": "metaspinner net GmbH",
+    "country": "TR",
+    "continent": "AS",
+    "city": "Seekamp 20",
+    "isp": "metaspinner net GmbH",
+    "hostingProvider": "metaspinner net GmbH"
+  },
   "httpInfo": {
     "headers": {
-      "x-nextjs-prerender": "1",
-      "cache-control": "s-maxage=31536000",
-      "content-encoding": "gzip",
-      "content-type": "text/html; charset=utf-8",
-      "etag": "\"l5zpvhi4xp5o5\"",
-      "x-nextjs-cache": "HIT",
-      "x-nextjs-stale-time": "300",
-      "x-powered-by": "Next.js",
-      "date": "Fri, 24 Oct 2025 18:41:44 GMT",
-      "vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Accept-Encoding"
+      "Date": "Fri, 24 Oct 2025 17:56:10 GMT",
+      "Server": "Apache",
+      "Last-Modified": "Tue, 01 Apr 2025 12:00:28 GMT",
+      "ETag": "\"1f4-631b6485b0f00-gzip\"",
+      "Accept-Ranges": "bytes",
+      "Vary": "Accept-Encoding",
+      "X-Powered-By": "PleskLin",
+      "Content-Length": "500",
+      "Keep-Alive": "timeout=5, max=99",
+      "Connection": "Keep-Alive",
+      "Content-Type": "text/html"
     },
     "statusCode": 200,
-    "contentLength": 7351,
-    "serverInfo": "absent",
+    "contentLength": 500,
+    "serverInfo": "Apache",
     "hsts": false
   },
   "tlsInfo": {
-    "issuer": "R12",
-    "subject": "lista-segura.com",
-    "validFrom": "2025-10-24 11:11:34",
-    "validTo": "2026-01-22 11:11:33",
-    "serialNumber": "6711eb2b95a5d04e84cf69e1b72a7d963a7",
+    "issuer": "R13",
+    "subject": "secure-netflix.com",
+    "validFrom": "2025-09-19 21:49:00",
+    "validTo": "2025-12-18 21:48:59",
+    "serialNumber": "55b9f363e19c6f5fb476892164ae6290a21",
     "sanEntries": [
-      "lista-segura.com"
+      "secure-netflix.com",
+      "www.secure-netflix.com"
     ],
-    "fingerprint": "478aa2d445294c0f81340c6d1a26bfff926a0a10c6d42881e9353184a2c3b548"
+    "fingerprint": "089e0c456a80c039a1f35ec617ee26671d0f3976ee886c850c348d9281c16b79"
   },
   "certificateInfo": {
-    "issuerCN": "R12",
-    "subjectCN": "lista-segura.com",
-    "notBefore": "2025-10-24 11:11:34",
-    "notAfter": "2026-01-22 11:11:33",
-    "serialNumber": "6711eb2b95a5d04e84cf69e1b72a7d963a7"
+    "issuerCN": "R13",
+    "subjectCN": "secure-netflix.com",
+    "notBefore": "2025-09-19 21:49:00",
+    "notAfter": "2025-12-18 21:48:59",
+    "serialNumber": "55b9f363e19c6f5fb476892164ae6290a21"
   },
   "contentInfo": {
-    "title": "Acesse agora",
-    "favicon": "https://lista-segura.com/favicon.ico",
-    "sha256": "05396e4088dfa7d475671b4afa17a8d0b10d54ceadec82bf330cb07daa3a7506",
-    "contentEntropy": 3.8368
+    "title": "absent",
+    "favicon": "https://secure-netflix.com/favicon.ico",
+    "sha256": "809084d1d2c8844b9220dd78aaa9709e791ecd8155cccaec1cef0fe08c3af36f",
+    "contentEntropy": 3.8146
   },
   "detectionVotes": {
-    "malicious": 0,
+    "malicious": 17,
     "suspicious": 0,
-    "harmless": 66,
-    "undetected": 32
+    "harmless": 54,
+    "undetected": 27
   },
-  "threatCategories": [],
-  "suspiciousFeatures": [
-    "external-resources"
+  "threatCategories": [
+    "Phishing (alphaMountain.ai)",
+    "phishing and fraud",
+    "Phishing and Other Frauds",
+    "phishing and other frauds"
   ],
+  "suspiciousFeatures": [],
   "externalResources": {
     "linkedDomains": "absent",
-    "embeddedUrls": [
-      "https://cdn.utmify.com.br/scripts/utms/latest.js"
-    ],
+    "embeddedUrls": [],
     "externalScripts": "absent",
     "trackers": []
   },
@@ -85,10 +97,25 @@
   },
   "passiveDns": {
     "distinctIps": [
-      "185.252.24.136"
+      "158.94.209.87",
+      "213.209.150.118",
+      "94.156.177.79",
+      "154.216.20.243",
+      "104.21.84.104",
+      "172.67.191.17",
+      "15.236.239.104",
+      "172.67.155.78",
+      "104.21.66.19",
+      "185.230.60.173",
+      "185.230.61.173",
+      "23.236.62.147",
+      "91.195.240.117",
+      "52.17.250.95",
+      "54.36.113.141",
+      "5.196.141.83"
     ],
-    "totalResolutions": 1,
-    "firstSeen": "2025-10-24T12:24:58.000Z",
-    "lastSeen": "2025-10-24T12:24:58.000Z"
+    "totalResolutions": 16,
+    "firstSeen": "2014-10-23T00:00:00.000Z",
+    "lastSeen": "2025-09-28T09:25:18.000Z"
   }
 }
