@@ -1,0 +1,111 @@
+{
+  "scanId": "195d6e29dc1d4e296baad5a9157daf33fd46006716a01f4fa49709b95102eb1a",
+  "reputation": 0,
+  "url": "http://lou-lab.com",
+  "hostname": "lou-lab.com",
+  "path": "/",
+  "finalUrl": "https://www.lou-lab.com/",
+  "urlEntropy": 3.7255,
+  "redirectChain": [
+    "http://lou-lab.com/",
+    "https://lou-lab.com/"
+  ],
+  "redirectDepth": 2,
+  "redirectEntropy": 3.8342,
+  "domain": {
+    "registrar": "NameCheap, Inc.",
+    "creationDate": "2025-07-03T19:13:12.000Z",
+    "expirationDate": "2030-07-03T19:13:12.000Z",
+    "domainAge": 112
+  },
+  "network": {},
+  "httpInfo": {
+    "headers": {
+      "cache-control": "public, max-age=0, must-revalidate",
+      "content-encoding": "br",
+      "content-type": "text/html; charset=utf-8",
+      "etag": "W/\"sdv7emo45z18py\"",
+      "server": "Vercel",
+      "x-matched-path": "/",
+      "x-nextjs-prerender": "1",
+      "x-nextjs-stale-time": "300",
+      "age": "3",
+      "date": "Wed, 03 Sep 2025 01:21:59 GMT",
+      "vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch",
+      "strict-transport-security": "max-age=63072000",
+      "x-powered-by": "Next.js",
+      "x-vercel-cache": "HIT",
+      "x-vercel-id": "iad1::iad1::jkr4r-1756862523246-236945a4b345"
+    },
+    "statusCode": 200,
+    "contentLength": 57970,
+    "serverInfo": "Vercel",
+    "hsts": true
+  },
+  "tlsInfo": {
+    "issuer": "R13",
+    "subject": "lou-lab.com",
+    "validFrom": "2025-09-16 01:47:28",
+    "validTo": "2025-12-15 01:47:27",
+    "serialNumber": "50d68ce07e4f6148cbf4fac3c6826222691",
+    "sanEntries": [
+      "lou-lab.com"
+    ],
+    "fingerprint": "6b36e80e90f43ba73c04189f65a994fd3b0749806fbd30e2c453661230c18532"
+  },
+  "certificateInfo": {
+    "issuerCN": "R13",
+    "subjectCN": "lou-lab.com",
+    "notBefore": "2025-09-16 01:47:28",
+    "notAfter": "2025-12-15 01:47:27",
+    "serialNumber": "50d68ce07e4f6148cbf4fac3c6826222691"
+  },
+  "contentInfo": {
+    "title": "Lou Research Lab",
+    "favicon": "https://www.lou-lab.com/favicon.ico",
+    "sha256": "e8ae0a0df0f0b7a89e0cb8f24067a7059b1d9285b26e5fa7e12bba54de84dc9d",
+    "contentEntropy": 3.8101
+  },
+  "detectionVotes": {
+    "malicious": 0,
+    "suspicious": 0,
+    "harmless": 67,
+    "undetected": 31
+  },
+  "threatCategories": [],
+  "suspiciousFeatures": [
+    "multiple-redirects"
+  ],
+  "externalResources": {
+    "linkedDomains": "absent",
+    "embeddedUrls": [
+      "https://olemiss.edu/research/",
+      "https://olemiss.edu/",
+      "https://cdn.sanity.io/images/qort1r0u/production/492eb80364e32200b94f5a81bfbf1786b7ebec31-500x500.png",
+      "https://cdn.sanity.io/images/qort1r0u/production/6e102e5e0896eeb324c9a04246a454c77e3216a9-3840x2160.png",
+      "https://cdn.sanity.io/images/qort1r0u/production/d36a3ad794ca6d42974654323cff00c9fd5f7f9f-1920x480.webp",
+      "https://cdn.sanity.io/images/qort1r0u/production/28cd4ccad119d8d5170d07d37851f3ebb41e107f-5016x3344.jpg",
+      "https://cdn.sanity.io/images/qort1r0u/production/569c85bedf075f48ddf0b32ecc7dd07d8c18d982-3840x2160.jpg",
+      "https://cdn.sanity.io/images/qort1r0u/production/781f85cfacc3ab51f9e52de2b86e7425626db74c-2048x1150.jpg",
+      "https://cdn.sanity.io/images/qort1r0u/production/227087bdd251d12e25bb75bd6a3d9ad1c55c6d2c-200x200.jpg",
+      "https://cdn.sanity.io/images/qort1r0u/production/82a1cc15996ebf94608c2d0f315c20987082c3a7-200x200.jpg",
+      "https://cdn.sanity.io/images/qort1r0u/production/f980d9763bf3106d52411559c02b1f61929891dc-200x200.jpg"
+    ],
+    "externalScripts": "absent",
+    "trackers": []
+  },
+  "behaviorInfo": {
+    "javascriptActivity": false,
+    "dataUriUsage": false,
+    "hiddenElements": false
+  },
+  "passiveDns": {
+    "distinctIps": [
+      "216.198.79.1",
+      "192.64.119.86"
+    ],
+    "totalResolutions": 2,
+    "firstSeen": "2025-07-06T05:33:09.000Z",
+    "lastSeen": "2025-09-03T01:22:09.000Z"
+  }
+}

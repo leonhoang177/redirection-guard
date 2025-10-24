@@ -1,0 +1,94 @@
+{
+  "scanId": "73ef17550e1ef50558f0995a9edafdbd571f03f1fd8600e6fc66659e6b9fdcf4",
+  "reputation": 0,
+  "url": "https://lista-segura.com/",
+  "hostname": "lista-segura.com",
+  "path": "/",
+  "finalUrl": "https://lista-segura.com/",
+  "urlEntropy": 3.9933,
+  "redirectChain": [
+    "https://lista-segura.com/"
+  ],
+  "redirectDepth": 1,
+  "redirectEntropy": 3.9933,
+  "domain": {
+    "registrar": "GRANSY S.R.O D/B/A SUBREG.CZ",
+    "creationDate": "2025-10-24T09:44:34.000Z",
+    "expirationDate": "2026-10-24T09:44:34.000Z",
+    "domainAge": 0
+  },
+  "network": {},
+  "httpInfo": {
+    "headers": {
+      "x-nextjs-prerender": "1",
+      "cache-control": "s-maxage=31536000",
+      "content-encoding": "gzip",
+      "content-type": "text/html; charset=utf-8",
+      "etag": "\"l5zpvhi4xp5o5\"",
+      "x-nextjs-cache": "HIT",
+      "x-nextjs-stale-time": "300",
+      "x-powered-by": "Next.js",
+      "date": "Fri, 24 Oct 2025 18:41:44 GMT",
+      "vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Accept-Encoding"
+    },
+    "statusCode": 200,
+    "contentLength": 7351,
+    "serverInfo": "absent",
+    "hsts": false
+  },
+  "tlsInfo": {
+    "issuer": "R12",
+    "subject": "lista-segura.com",
+    "validFrom": "2025-10-24 11:11:34",
+    "validTo": "2026-01-22 11:11:33",
+    "serialNumber": "6711eb2b95a5d04e84cf69e1b72a7d963a7",
+    "sanEntries": [
+      "lista-segura.com"
+    ],
+    "fingerprint": "478aa2d445294c0f81340c6d1a26bfff926a0a10c6d42881e9353184a2c3b548"
+  },
+  "certificateInfo": {
+    "issuerCN": "R12",
+    "subjectCN": "lista-segura.com",
+    "notBefore": "2025-10-24 11:11:34",
+    "notAfter": "2026-01-22 11:11:33",
+    "serialNumber": "6711eb2b95a5d04e84cf69e1b72a7d963a7"
+  },
+  "contentInfo": {
+    "title": "Acesse agora",
+    "favicon": "https://lista-segura.com/favicon.ico",
+    "sha256": "05396e4088dfa7d475671b4afa17a8d0b10d54ceadec82bf330cb07daa3a7506",
+    "contentEntropy": 3.8368
+  },
+  "detectionVotes": {
+    "malicious": 0,
+    "suspicious": 0,
+    "harmless": 66,
+    "undetected": 32
+  },
+  "threatCategories": [],
+  "suspiciousFeatures": [
+    "external-resources"
+  ],
+  "externalResources": {
+    "linkedDomains": "absent",
+    "embeddedUrls": [
+      "https://cdn.utmify.com.br/scripts/utms/latest.js"
+    ],
+    "externalScripts": "absent",
+    "trackers": []
+  },
+  "behaviorInfo": {
+    "javascriptActivity": false,
+    "dataUriUsage": false,
+    "hiddenElements": false
+  },
+  "passiveDns": {
+    "distinctIps": [
+      "185.252.24.136"
+    ],
+    "totalResolutions": 1,
+    "firstSeen": "2025-10-24T12:24:58.000Z",
+    "lastSeen": "2025-10-24T12:24:58.000Z"
+  }
+}

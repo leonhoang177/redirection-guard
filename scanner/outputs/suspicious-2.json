@@ -1,0 +1,101 @@
+{
+  "scanId": "606dd074f29af12a7326a589b492ea932284b9cb177fbd547b81dbe495000c20",
+  "reputation": 0,
+  "url": "https://www-e.brou-siemprenlinea.site",
+  "hostname": "www-e.brou-siemprenlinea.site",
+  "path": "/",
+  "finalUrl": "https://www-e.brou-siemprenlinea.site/index_m.php",
+  "urlEntropy": 4.0573,
+  "redirectChain": [
+    "https://www-e.brou-siemprenlinea.site/"
+  ],
+  "redirectDepth": 1,
+  "redirectEntropy": 4.0536,
+  "domain": {
+    "registrar": "HOSTINGER operations, UAB",
+    "creationDate": "2025-10-24T00:23:30.000Z",
+    "expirationDate": "2026-10-24T23:59:59.000Z",
+    "domainAge": 0
+  },
+  "network": {},
+  "httpInfo": {
+    "headers": {
+      "Date": "Fri, 24 Oct 2025 18:39:53 GMT",
+      "Content-Type": "text/html; charset=UTF-8",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+      "expires": "Thu, 19 Nov 1981 08:52:00 GMT",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "pragma": "no-cache",
+      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=XT4Tui6AN1Cd4jP8aNmtCQX%2FBuYCqKRNPd90b3uQVwEtBrEcsefR%2FzJgxUXZoxyyReXJOWMKxjGLcgh89vmWw%2BdpH98DwMboFRBwCWrG7phElgS%2BAAWGqATLyYCs\"}]}",
+      "vary": "Accept-Encoding",
+      "Server": "cloudflare",
+      "x-turbo-charged-by": "LiteSpeed",
+      "cf-cache-status": "DYNAMIC",
+      "Content-Encoding": "br",
+      "Set-Cookie": "PHPSESSID=4d2phkfkrnlrga44i2odcvi5qa; Path=/",
+      "CF-RAY": "993b997679411715-IAD",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    },
+    "statusCode": 200,
+    "contentLength": 1728,
+    "serverInfo": "cloudflare",
+    "hsts": false
+  },
+  "tlsInfo": {
+    "issuer": "WE1",
+    "subject": "brou-siemprenlinea.site",
+    "validFrom": "2025-10-24 00:02:12",
+    "validTo": "2026-01-22 00:59:16",
+    "serialNumber": "b07f00d6ce1867910d975f6b8cb59aac",
+    "sanEntries": [
+      "brou-siemprenlinea.site",
+      "*.brou-siemprenlinea.site"
+    ],
+    "fingerprint": "8e8ccdb3cca3493f89a92aec09d794d079e792758e2cbee372db10cd77f649e0"
+  },
+  "certificateInfo": {
+    "issuerCN": "WE1",
+    "subjectCN": "brou-siemprenlinea.site",
+    "notBefore": "2025-10-24 00:02:12",
+    "notAfter": "2026-01-22 00:59:16",
+    "serialNumber": "b07f00d6ce1867910d975f6b8cb59aac"
+  },
+  "contentInfo": {
+    "title": "404 Not Found",
+    "favicon": "https://www-e.brou-siemprenlinea.site/favicon.ico",
+    "sha256": "ae15364d9337fadab3311dee402bd8107454bed1ff5b5aa7a21dbf624e03ba8d",
+    "contentEntropy": 3.7607
+  },
+  "detectionVotes": {
+    "malicious": 0,
+    "suspicious": 0,
+    "harmless": 65,
+    "undetected": 33
+  },
+  "threatCategories": [],
+  "suspiciousFeatures": [
+    "iframes"
+  ],
+  "externalResources": {
+    "linkedDomains": "absent",
+    "embeddedUrls": [],
+    "externalScripts": "absent",
+    "trackers": []
+  },
+  "behaviorInfo": {
+    "javascriptActivity": false,
+    "dataUriUsage": false,
+    "hiddenElements": false
+  },
+  "passiveDns": {
+    "distinctIps": [
+      "172.67.223.131",
+      "104.21.62.119"
+    ],
+    "totalResolutions": 2,
+    "firstSeen": "2025-10-24T15:28:42.000Z",
+    "lastSeen": "2025-10-24T15:28:42.000Z"
+  }
+}

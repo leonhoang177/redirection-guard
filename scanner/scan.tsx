@@ -277,6 +277,18 @@ function deepMarkAbsent(value: any): any {
   return value;
 }
 
+// Helper: Append a failed URL to a waitlist file (best-effort)
+function appendToWaitlist(url: string, note?: string) {
+  try {
+    const line = `${new Date().toISOString()}\t${url}${
+      note ? `\t${note}` : ""
+    }\n`;
+    fs.appendFileSync("waitlist.txt", line, { encoding: "utf-8" });
+  } catch (e) {
+    // best-effort; do not crash if we can't write the waitlist
+  }
+}
+
 // ====== CONFIG ======
 const API_KEY =
   "1d0b32a0630fc45fc0f7ef17c35421d2f56d961f97fcca7a9a135b4235268bf9";
@@ -343,32 +355,6 @@ async function submitUrl(url: string) {
   const data = await vtPost("/urls", form);
   // { data: { id: "<analysis-id>", type: "analysis" } }
   return data?.data?.id as string | undefined;
-}
-
-function analysisDone(status: string | undefined) {
-  // status: queued | in-progress | completed (and maybe "failed")
-  return status === "completed" || status === "failed";
-}
-
-async function pollAnalysis(
-  analysisId: string,
-  timeoutMs: number,
-  intervalMs: number
-) {
-  const start = Date.now();
-  while (true) {
-    const data = await vtGet(`/analyses/${analysisId}`);
-    const status = data?.data?.attributes?.status as string | undefined;
-
-    if (analysisDone(status)) {
-      return data;
-    }
-
-    if (Date.now() - start > timeoutMs) {
-      throw new Error("Timed out waiting for analysis to complete.");
-    }
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
 }
 
 async function fetchDomainInfo(hostname: string) {
@@ -919,9 +905,6 @@ async function buildVTMetadata(
   const threatCategories: string[] | undefined = attr.categories
     ? Object.values(attr.categories).map((v: unknown) => String(v))
     : undefined;
-  const malwareFamily = attr.threat_names ?? undefined;
-  const impersonatedBrand =
-    attr.targeted_brand ?? attr.popular_threat_name ?? undefined;
   const suspiciousFeatures = attr.tags ?? undefined;
 
   // Normalize trackers: VT may return an array of objects, a single object, or nothing
@@ -1193,8 +1176,6 @@ async function buildVTMetadata(
     detectionVotes,
 
     threatCategories,
-    malwareFamily,
-    impersonatedBrand,
     suspiciousFeatures,
 
     externalResources,
@@ -1215,45 +1196,36 @@ async function run() {
 
   let urlReport: any | null = null;
 
-  // 1) Try to fetch an existing report
+  // 1) Try to fetch an existing report (no retries, no submit)
   try {
     urlReport = await getUrlReport(target);
   } catch (e: any) {
-    console.log("No existing report found — submitting URL to VirusTotal…");
-    const analysisId = await submitUrl(target);
-    if (!analysisId) throw new Error("No analysis id returned by VT.");
-    dlog("submitted analysis id:", analysisId);
-
-    // Wait 10s, then try to fetch the URL report up to 3 attempts total.
-    const initialWaitMs = 20000;
-    const retryWaitMs = 10000;
-    const maxRetries = 2;
-
     console.log(
-      `Waiting ${Math.round(initialWaitMs / 1000)}s for VT to populate data...`
+      "No existing VirusTotal report — submitting to VT and waitlisting."
     );
-    await new Promise((r) => setTimeout(r, initialWaitMs));
-
-    let attempt = 0;
-    while (true) {
-      try {
-        urlReport = await getUrlReport(target);
-        break;
-      } catch (err) {
-        if (attempt >= maxRetries) {
-          throw new Error(
-            "Report not available yet after waiting; try again later."
-          );
-        }
-        attempt++;
-        console.log(
-          `Still preparing on VT side. Retrying in ${Math.round(
-            retryWaitMs / 1000
-          )}s (attempt ${attempt}/${maxRetries})`
-        );
-        await new Promise((r) => setTimeout(r, retryWaitMs));
-      }
+    try {
+      // Submit to VT so analysis can start, but do not poll.
+      await submitUrl(target);
+    } catch (_) {
+      // ignore submission failures; still waitlist the URL
     }
+    try {
+      // Write ONLY the raw URL, one per line
+      fs.appendFileSync("waitlist.txt", `${target}\n`, { encoding: "utf-8" });
+    } catch (_) {
+      // best-effort; don't crash if write fails
+    }
+    return; // stop; no output.json
+  }
+
+  // If VT record exists but lacks analysis stats, also waitlist and exit
+  const _attr = urlReport?.data?.attributes ?? {};
+  if (!_attr || !_attr.last_analysis_stats) {
+    console.log(
+      "VirusTotal record exists but analysis not complete — adding to waitlist and exiting."
+    );
+    appendToWaitlist(target, "analysis not complete");
+    return; // do nothing else
   }
 
   // 2) Extract a concise, useful summary from VT payload
@@ -1262,7 +1234,11 @@ async function run() {
   const output = deepMarkAbsent(metadata);
 
   // 4) Write JSON to output.json file
-  fs.writeFileSync("output.json", JSON.stringify(output, null, 2), "utf-8");
+  fs.writeFileSync(
+    "./outputs/output.json",
+    JSON.stringify(output, null, 2),
+    "utf-8"
+  );
   console.log("Output written to output.json");
 }
 
