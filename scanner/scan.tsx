@@ -22,9 +22,12 @@ export interface VTURLMetadata {
   hostname: string;
   path: string;
 
-  redirectChain?: string[];
-  redirectDepth: number;
-  redirectEntropy?: number;
+  // redirectChain?: string[];
+  redirect?: {
+    count: number;
+    entropy?: number;
+    similarity?: number;
+  };
 
   // Domain info
   domain: {
@@ -81,7 +84,7 @@ export interface VTURLMetadata {
 
   // Detection and threat info
   detectionVotes: DetectionStats;
-  threatCategories?: string[];
+  topicCategories?: string[];
   malwareFamily?: string[];
   impersonatedBrand?: string;
   suspiciousFeatures?: string[];
@@ -89,15 +92,20 @@ export interface VTURLMetadata {
   // External resources and links
   externalResources: {
     linkedDomains?: string[];
+    linkedDomainsCount?: number;
+    linkedDomainsEntropy?: number;
+    linkedDomainsSimilarity?: number;
     embeddedUrls?: string[];
     trackers?: string[];
+    embeddedUrlsCount?: number;
+    embeddedUrlsEntropy?: number;
+    embeddedUrlsSimilarity?: number;
   };
 
   // Passive DNS and historical data
   passiveDns?: {
     firstSeen?: string;
     lastSeen?: string;
-    distinctIps?: string[];
     totalResolutions?: number;
   };
 }
@@ -620,6 +628,50 @@ function normalizedEntropy(s: string): number {
   return +H.toFixed(4); // bits/char
 }
 
+// Simple redirect similarity metric: average normalized Levenshtein similarity between all URLs
+function redirectSimilarity(urls: string[]): number {
+  if (!Array.isArray(urls) || urls.length < 2) return 1;
+  function levenshteinSim(a: string, b: string): number {
+    const m = a.length,
+      n = b.length;
+    if (!m && !n) return 1;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + cost
+        );
+      }
+    }
+    const dist = dp[m][n];
+    return 1 - dist / Math.max(m, n);
+  }
+  let sum = 0,
+    pairs = 0;
+  for (let i = 0; i < urls.length; i++) {
+    for (let j = i + 1; j < urls.length; j++) {
+      sum += levenshteinSim(urls[i], urls[j]);
+      pairs++;
+    }
+  }
+  return Number((sum / pairs).toFixed(4));
+}
+
+function averageStringEntropy(values: string[]): number {
+  if (!Array.isArray(values) || values.length === 0) return 0;
+  const avg =
+    values.reduce(
+      (sum, v) => sum + normalizedEntropy(String(v).toLowerCase()),
+      0
+    ) / values.length;
+  return Number(avg.toFixed(4));
+}
+
 // Heuristic parser for response-time style headers (ms)
 function parseDurationToMs(raw: string): number | undefined {
   if (!raw) return undefined;
@@ -737,15 +789,11 @@ async function fetchPassiveDnsForDomain(hostname: string) {
     // Prefer the documented /resolutions resource; limit to a sane page
     const resp = await vtGet(`/domains/${hostname}/resolutions?limit=40`);
     const rows = Array.isArray(resp?.data) ? resp.data : [];
-    const ips: string[] = [];
     let first: number | undefined;
     let last: number | undefined;
 
     for (const r of rows) {
       const a = r?.attributes || {};
-      const ip = a.ip_address || r?.id; // VT often places IP in attributes
-      if (ip && !ips.includes(ip)) ips.push(ip);
-
       const when = a.date || a.last_resolved || a.first_seen || a.last_seen;
       if (typeof when === "number") {
         if (first === undefined || when < first) first = when;
@@ -754,7 +802,6 @@ async function fetchPassiveDnsForDomain(hostname: string) {
     }
 
     return {
-      distinctIps: ips,
       totalResolutions: rows.length,
       firstSeen: toISODate(first),
       lastSeen: toISODate(last),
@@ -772,15 +819,11 @@ async function fetchPassiveDnsForIP(ip: string) {
   try {
     const resp = await vtGet(`/ip_addresses/${ip}/resolutions?limit=40`);
     const rows = Array.isArray(resp?.data) ? resp.data : [];
-    const hosts: string[] = [];
     let first: number | undefined;
     let last: number | undefined;
 
     for (const r of rows) {
       const a = r?.attributes || {};
-      const host = a.host_name || r?.id; // VT often places hostname in attributes
-      if (host && !hosts.includes(host)) hosts.push(host);
-
       const when = a.date || a.last_resolved || a.first_seen || a.last_seen;
       if (typeof when === "number") {
         if (first === undefined || when < first) first = when;
@@ -789,7 +832,6 @@ async function fetchPassiveDnsForIP(ip: string) {
     }
 
     return {
-      distinctIps: undefined, // this call returns hostnames, not IPs
       totalResolutions: rows.length,
       firstSeen: toISODate(first),
       lastSeen: toISODate(last),
@@ -831,10 +873,13 @@ async function buildVTMetadata(
   };
 
   // Redirect info (define early so contentInfo can use it)
+  // const redirectChain: string[] = Array.isArray(attr.redirection_chain)
+  //   ? attr.redirection_chain
+  //   : [];
   const redirectChain: string[] = Array.isArray(attr.redirection_chain)
     ? attr.redirection_chain
     : [];
-  const redirectDepth = redirectChain.length;
+  const redirectCount = redirectChain.length;
 
   // Content Info (with fallbacks)
   // Best-effort content entropy without fetching body:
@@ -874,8 +919,24 @@ async function buildVTMetadata(
   // urlEntropy: normalized entropy of the PROVIDED URL only
   const urlEntropy = normalizedEntropy(url);
 
-  // redirectEntropy: normalized entropy of the concatenated redirection URLs only
-  const redirectEntropy = normalizedEntropy(redirectChain.join("|"));
+  // redirectEntropy: average of individual URL entropies across the chain
+  const redirectEntropy =
+    redirectChain.length > 0
+      ? Number(
+          (
+            redirectChain.reduce(
+              (sum, u) => sum + normalizedEntropy(String(u)),
+              0
+            ) / redirectChain.length
+          ).toFixed(4)
+        )
+      : 0;
+  const redirectSimilarityValue = redirectSimilarity(redirectChain);
+  const redirect = {
+    count: redirectCount,
+    entropy: redirectEntropy,
+    similarity: redirectSimilarityValue,
+  };
 
   const contentInfo = {
     title: attr.title ?? undefined,
@@ -1017,7 +1078,7 @@ async function buildVTMetadata(
   };
 
   // Threat info
-  const threatCategories: string[] | undefined = attr.categories
+  const topicCategories: string[] | undefined = attr.categories
     ? Object.values(attr.categories).map((v: unknown) => String(v))
     : undefined;
   const suspiciousFeatures = attr.tags ?? undefined;
@@ -1036,6 +1097,9 @@ async function buildVTMetadata(
   const embeddedUrls: string[] = Array.isArray(attr.outgoing_links)
     ? (attr.outgoing_links as string[])
     : [];
+  const embeddedUrlsCount = embeddedUrls.length;
+  const embeddedUrlsEntropy = averageStringEntropy(embeddedUrls);
+  const embeddedUrlsSimilarity = redirectSimilarity(embeddedUrls);
 
   // Build linked domains from multiple sources (relationships + outgoing_links + redirects)
   const linkedHostSet = new Set<string>();
@@ -1069,10 +1133,16 @@ async function buildVTMetadata(
   linkedHostSet.delete(hostname.toLowerCase());
 
   const linkedDomains = Array.from(linkedHostSet);
+  const linkedDomainsEntropy = averageStringEntropy(linkedDomains);
+  const linkedDomainsSimilarity = redirectSimilarity(linkedDomains);
 
   const externalResources = {
-    linkedDomains: linkedDomains.length ? linkedDomains : undefined,
-    embeddedUrls,
+    linkedDomainsCount: linkedDomains.length,
+    linkedDomainsEntropy,
+    linkedDomainsSimilarity,
+    embeddedUrlsCount,
+    embeddedUrlsEntropy,
+    embeddedUrlsSimilarity,
     trackers,
   };
 
@@ -1093,9 +1163,7 @@ async function buildVTMetadata(
     const pdDomain = await fetchPassiveDnsForDomain(hostname);
     if (
       pdDomain &&
-      (pdDomain.firstSeen ||
-        pdDomain.lastSeen ||
-        (pdDomain.distinctIps && pdDomain.distinctIps.length))
+      (pdDomain.firstSeen || pdDomain.lastSeen || pdDomain.totalResolutions)
     ) {
       passiveDns = pdDomain;
     }
@@ -1131,11 +1199,6 @@ async function buildVTMetadata(
           e?.message || String(e)
         );
     }
-  }
-
-  // Fallback 2: passive DNS distinct IPs (already fetched above)
-  if (!servingIp && passiveDns?.distinctIps && passiveDns.distinctIps.length) {
-    servingIp = passiveDns.distinctIps[0];
   }
 
   // Fallback 3: domain first A record from last_dns_records
@@ -1306,9 +1369,8 @@ async function buildVTMetadata(
     urlEntropy,
     hostname,
     path,
-    redirectChain,
-    redirectDepth,
-    redirectEntropy,
+    // redirectChain,
+    redirect,
     domain: {
       registrar: domain.registrar,
       creationDate: domain.creationDate,
@@ -1321,7 +1383,7 @@ async function buildVTMetadata(
     certificateInfo,
     contentInfo,
     detectionVotes,
-    threatCategories,
+    topicCategories,
     suspiciousFeatures,
     externalResources,
     passiveDns,

@@ -1,108 +1,101 @@
 {
-  "scanId": "fff1ff2c374b0e2de2375086d67aa658b1365620f3eb53ee283f46c2ca531b40",
+  "scanId": "d4ae6dcd8284ba2410d2811c9a7f5d4e21d520d0e6b91f278a51690c0e3ecf92",
   "reputation": 0,
-  "url": "https://lou-lab.com",
-  "urlEntropy": 3.8269,
-  "hostname": "lou-lab.com",
-  "path": "/",
-  "redirectChain": [
-    "https://lou-lab.com/"
-  ],
-  "redirectDepth": 1,
-  "redirectEntropy": 3.7842,
+  "url": "https://github.com/ecruzmango/cybersecurity-phishing-simulator",
+  "urlEntropy": 4.3052,
+  "hostname": "github.com",
+  "path": "/ecruzmango/cybersecurity-phishing-simulator",
+  "redirect": {
+    "count": 1,
+    "entropy": 4.3052,
+    "similarity": 1
+  },
   "domain": {
-    "registrar": "NameCheap, Inc.",
-    "creationDate": "2025-07-03T19:13:12.000Z",
-    "expirationDate": "2030-07-03T19:13:12.000Z",
-    "domainAge": 115
+    "registrar": "MarkMonitor Inc.",
+    "creationDate": "2007-10-09T18:20:50.000Z",
+    "expirationDate": "2026-10-09T18:20:50.000Z",
+    "domainAge": 6592
   },
   "network": {
-    "asn": "16509",
-    "asOwner": "AMAZON-02",
+    "asn": "36459",
+    "asOwner": "GITHUB",
     "country": "US"
   },
   "httpInfo": {
     "headers": {
-      "date": "Mon, 20 Oct 2025 17:29:36 GMT",
-      "x-matched-path": "/",
-      "x-vercel-id": "sfo1::iad1::t8hxh-1760981408324-9114252cd4d0",
-      "strict-transport-security": "max-age=63072000",
-      "vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch",
-      "x-nextjs-stale-time": "300",
-      "cache-control": "public, max-age=0, must-revalidate",
-      "etag": "W/\"eckwgy290118py\"",
-      "x-nextjs-prerender": "1",
-      "x-powered-by": "Next.js",
-      "content-encoding": "br",
-      "server": "Vercel",
-      "x-vercel-cache": "STALE",
-      "age": "32",
-      "content-type": "text/html; charset=utf-8"
+      "cache-control": "max-age=0, private, must-revalidate",
+      "content-type": "text/html; charset=utf-8",
+      "date": "Mon, 27 Oct 2025 17:46:48 GMT",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "deny",
+      "content-security-policy": "default-src 'none'; base-uri 'self'; child-src github.githubassets.com github.com/assets-cdn/worker/ github.com/assets/ gist.github.com/assets-cdn/worker/; connect-src 'self' uploads.github.com www.githubstatus.com collector.github.com raw.githubusercontent.com api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com *.rel.tunnels.api.visualstudio.com wss://*.rel.tunnels.api.visualstudio.com github.githubassets.com objects-origin.githubusercontent.com copilot-proxy.githubusercontent.com proxy.individual.githubcopilot.com proxy.business.githubcopilot.com proxy.enterprise.githubcopilot.com *.actions.githubusercontent.com wss://*.actions.githubusercontent.com productionresultssa0.blob.core.windows.net/ productionresultssa1.blob.core.windows.net/ productionresultssa2.blob.core.windows.net/ productionresultssa3.blob.core.windows.net/ productionresultssa4.",
+      "x-github-request-id": "8600:2AB8BF:BA064E:102C041:68FFB007",
+      "content-encoding": "gzip",
+      "referrer-policy": "no-referrer-when-downgrade",
+      "server": "github.com",
+      "accept-ranges": "bytes",
+      "etag": "W/\"0fe3bd94f43b9dffb111ddf3db56b80a\"",
+      "strict-transport-security": "max-age=31536000; includeSubdomains; preload",
+      "vary": "X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, X-Requested-With,Accept-Encoding, Accept, X-Requested-With",
+      "x-xss-protection": "0"
     },
     "statusCode": 200,
-    "contentLength": 57970,
-    "serverInfo": "Vercel",
+    "contentLength": 273400,
+    "serverInfo": "github.com",
     "hsts": true
   },
   "tlsInfo": {
-    "issuer": "R13",
-    "subject": "lou-lab.com",
-    "validFrom": "2025-09-16 01:47:28",
-    "validTo": "2025-12-15 01:47:27",
-    "serialNumber": "50d68ce07e4f6148cbf4fac3c6826222691",
+    "issuer": "Sectigo ECC Domain Validation Secure Server CA",
+    "subject": "github.com",
+    "validFrom": "2025-02-05 00:00:00",
+    "validTo": "2026-02-05 23:59:59",
+    "serialNumber": "ab6686b5627be80596821330128649f5",
     "sanEntries": [
-      "lou-lab.com"
+      "github.com",
+      "www.github.com"
     ],
-    "fingerprint": "6b36e80e90f43ba73c04189f65a994fd3b0749806fbd30e2c453661230c18532"
+    "fingerprint": "b8bb81876833873942045a8df8f06219e00602ebcb4384c7abc24f18379c87f5"
   },
   "certificateInfo": {
-    "issuerCN": "R13",
-    "subjectCN": "lou-lab.com",
-    "notBefore": "2025-09-16 01:47:28",
-    "notAfter": "2025-12-15 01:47:27",
-    "serialNumber": "50d68ce07e4f6148cbf4fac3c6826222691"
+    "issuerCN": "Sectigo ECC Domain Validation Secure Server CA",
+    "subjectCN": "github.com",
+    "notBefore": "2025-02-05 00:00:00",
+    "notAfter": "2026-02-05 23:59:59",
+    "serialNumber": "ab6686b5627be80596821330128649f5"
   },
   "contentInfo": {
-    "title": "Lou Research Lab",
-    "favicon": "https://lou-lab.com/favicon.ico",
-    "sha256": "10cc32d0afefcf60ebed060ac22875b51e240d01baa44dc4e044b5ed63f3e80f",
-    "contentEntropy": 3.7572
+    "title": "GitHub - ecruzmango/cybersecurity-phishing-simulator",
+    "favicon": "https://github.com/favicon.ico",
+    "sha256": "3c47c15f9bcbbc1b623423f6131baaf3d5191d05a904bc49f5c62d7b34d9566c",
+    "contentEntropy": 3.7145
   },
   "detectionVotes": {
     "malicious": 0,
     "suspicious": 0,
-    "harmless": 66,
-    "undetected": 32
+    "harmless": 71,
+    "undetected": 27
   },
-  "threatCategories": [],
-  "suspiciousFeatures": [],
+  "topicCategories": [
+    "computersandsoftware",
+    "web applications",
+    "information technology",
+    "information technology"
+  ],
+  "suspiciousFeatures": [
+    "external-resources"
+  ],
   "externalResources": {
-    "linkedDomains": [
-      "olemiss.edu",
-      "cdn.sanity.io"
-    ],
-    "embeddedUrls": [
-      "https://olemiss.edu/research/",
-      "https://olemiss.edu/",
-      "https://cdn.sanity.io/images/qort1r0u/production/492eb80364e32200b94f5a81bfbf1786b7ebec31-500x500.png",
-      "https://cdn.sanity.io/images/qort1r0u/production/6e102e5e0896eeb324c9a04246a454c77e3216a9-3840x2160.png",
-      "https://cdn.sanity.io/images/qort1r0u/production/d36a3ad794ca6d42974654323cff00c9fd5f7f9f-1920x480.webp",
-      "https://cdn.sanity.io/images/qort1r0u/production/28cd4ccad119d8d5170d07d37851f3ebb41e107f-5016x3344.jpg",
-      "https://cdn.sanity.io/images/qort1r0u/production/569c85bedf075f48ddf0b32ecc7dd07d8c18d982-3840x2160.jpg",
-      "https://cdn.sanity.io/images/qort1r0u/production/781f85cfacc3ab51f9e52de2b86e7425626db74c-2048x1150.jpg",
-      "https://cdn.sanity.io/images/qort1r0u/production/227087bdd251d12e25bb75bd6a3d9ad1c55c6d2c-200x200.jpg",
-      "https://cdn.sanity.io/images/qort1r0u/production/82a1cc15996ebf94608c2d0f315c20987082c3a7-200x200.jpg",
-      "https://cdn.sanity.io/images/qort1r0u/production/f980d9763bf3106d52411559c02b1f61929891dc-200x200.jpg"
-    ],
+    "linkedDomainsCount": 9,
+    "linkedDomainsEntropy": 3.5508,
+    "linkedDomainsSimilarity": 0.4277,
+    "embeddedUrlsCount": 67,
+    "embeddedUrlsEntropy": 4.4325,
+    "embeddedUrlsSimilarity": 0.405,
     "trackers": []
   },
   "passiveDns": {
-    "distinctIps": [
-      "216.198.79.1",
-      "192.64.119.86"
-    ],
-    "totalResolutions": 2,
-    "firstSeen": "2025-07-06T05:33:09.000Z",
-    "lastSeen": "2025-09-03T01:22:09.000Z"
+    "totalResolutions": 40,
+    "firstSeen": "2019-12-09T00:04:13.000Z",
+    "lastSeen": "2025-09-17T21:36:52.000Z"
   }
 }
