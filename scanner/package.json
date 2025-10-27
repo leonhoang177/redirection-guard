@@ -7,8 +7,8 @@
   },
   "type": "module",
   "scripts": {
-    "scan": "tsx scan.tsx",
-    "scan:url": "tsx scan.tsx https://apple.com"
+    "scan": "tsx scanner.tsx",
+    "scan:url": "tsx scanner.tsx https://apple.com"
   },
   "dependencies": {
     "psl": "^1.15.0",

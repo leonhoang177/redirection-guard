@@ -1,101 +1,103 @@
 {
-  "scanId": "d4ae6dcd8284ba2410d2811c9a7f5d4e21d520d0e6b91f278a51690c0e3ecf92",
+  "scanId": "8732e86844cb2ae7df3238452dc7d58c375ff9bb6600fdfec65751933931de10",
   "reputation": 0,
-  "url": "https://github.com/ecruzmango/cybersecurity-phishing-simulator",
-  "urlEntropy": 4.3052,
-  "hostname": "github.com",
-  "path": "/ecruzmango/cybersecurity-phishing-simulator",
+  "url": "http://notion.com",
+  "urlEntropy": 3.2928,
+  "hostname": "notion.com",
+  "path": "/",
   "redirect": {
-    "count": 1,
-    "entropy": 4.3052,
-    "similarity": 1
-  },
-  "domain": {
-    "registrar": "MarkMonitor Inc.",
-    "creationDate": "2007-10-09T18:20:50.000Z",
-    "expirationDate": "2026-10-09T18:20:50.000Z",
-    "domainAge": 6592
-  },
-  "network": {
-    "asn": "36459",
-    "asOwner": "GITHUB",
-    "country": "US"
-  },
-  "httpInfo": {
-    "headers": {
-      "cache-control": "max-age=0, private, must-revalidate",
-      "content-type": "text/html; charset=utf-8",
-      "date": "Mon, 27 Oct 2025 17:46:48 GMT",
-      "x-content-type-options": "nosniff",
-      "x-frame-options": "deny",
-      "content-security-policy": "default-src 'none'; base-uri 'self'; child-src github.githubassets.com github.com/assets-cdn/worker/ github.com/assets/ gist.github.com/assets-cdn/worker/; connect-src 'self' uploads.github.com www.githubstatus.com collector.github.com raw.githubusercontent.com api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com *.rel.tunnels.api.visualstudio.com wss://*.rel.tunnels.api.visualstudio.com github.githubassets.com objects-origin.githubusercontent.com copilot-proxy.githubusercontent.com proxy.individual.githubcopilot.com proxy.business.githubcopilot.com proxy.enterprise.githubcopilot.com *.actions.githubusercontent.com wss://*.actions.githubusercontent.com productionresultssa0.blob.core.windows.net/ productionresultssa1.blob.core.windows.net/ productionresultssa2.blob.core.windows.net/ productionresultssa3.blob.core.windows.net/ productionresultssa4.",
-      "x-github-request-id": "8600:2AB8BF:BA064E:102C041:68FFB007",
-      "content-encoding": "gzip",
-      "referrer-policy": "no-referrer-when-downgrade",
-      "server": "github.com",
-      "accept-ranges": "bytes",
-      "etag": "W/\"0fe3bd94f43b9dffb111ddf3db56b80a\"",
-      "strict-transport-security": "max-age=31536000; includeSubdomains; preload",
-      "vary": "X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, X-Requested-With,Accept-Encoding, Accept, X-Requested-With",
-      "x-xss-protection": "0"
-    },
-    "statusCode": 200,
-    "contentLength": 273400,
-    "serverInfo": "github.com",
-    "hsts": true
-  },
-  "tlsInfo": {
-    "issuer": "Sectigo ECC Domain Validation Secure Server CA",
-    "subject": "github.com",
-    "validFrom": "2025-02-05 00:00:00",
-    "validTo": "2026-02-05 23:59:59",
-    "serialNumber": "ab6686b5627be80596821330128649f5",
-    "sanEntries": [
-      "github.com",
-      "www.github.com"
-    ],
-    "fingerprint": "b8bb81876833873942045a8df8f06219e00602ebcb4384c7abc24f18379c87f5"
-  },
-  "certificateInfo": {
-    "issuerCN": "Sectigo ECC Domain Validation Secure Server CA",
-    "subjectCN": "github.com",
-    "notBefore": "2025-02-05 00:00:00",
-    "notAfter": "2026-02-05 23:59:59",
-    "serialNumber": "ab6686b5627be80596821330128649f5"
-  },
-  "contentInfo": {
-    "title": "GitHub - ecruzmango/cybersecurity-phishing-simulator",
-    "favicon": "https://github.com/favicon.ico",
-    "sha256": "3c47c15f9bcbbc1b623423f6131baaf3d5191d05a904bc49f5c62d7b34d9566c",
-    "contentEntropy": 3.7145
+    "count": 2,
+    "entropy": 3.3291,
+    "similarity": 0.9474
   },
   "detectionVotes": {
     "malicious": 0,
     "suspicious": 0,
-    "harmless": 71,
-    "undetected": 27
+    "harmless": 70,
+    "undetected": 28
   },
-  "topicCategories": [
-    "computersandsoftware",
-    "web applications",
-    "information technology",
-    "information technology"
+  "domain": {
+    "registrar": "Amazon Registrar, Inc.",
+    "creationDate": "1997-10-06T04:00:00.000Z",
+    "expirationDate": "2033-10-05T04:00:00.000Z",
+    "domainAge": 10248
+  },
+  "network": {
+    "asn": "33191",
+    "asOwner": "NOTION",
+    "country": "US"
+  },
+  "httpInfo": {
+    "headers": {
+      "content-security-policy-count": 40,
+      "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+      "x-frame-options": null,
+      "x-content-type-options": null,
+      "referrer-policy": "strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "cache-control": "public, max-age=0",
+      "x-powered-by": "Next.js"
+    },
+    "statusCode": 200,
+    "contentLength": 172153,
+    "serverInfo": "cloudflare",
+    "hsts": true
+  },
+  "tlsInfo": {
+    "issuer": "WE1",
+    "subject": "notion.com",
+    "validFrom": "2025-09-22 00:58:23",
+    "validTo": "2025-12-21 01:58:18",
+    "serialNumber": "13ff1180540f63250e61108c0bb0c044",
+    "fingerprint": "b0548e9210dc7139405c2aca47f80f56b554bc2f1bac4657dd7abd4d8386a8ca",
+    "sanEntriesCount": 2,
+    "sanEntriesEntropy": 2.7509,
+    "sanEntriesSimilarity": 0.8333
+  },
+  "certificateInfo": {
+    "issuerCN": "WE1",
+    "subjectCN": "notion.com",
+    "notBefore": "2025-09-22 00:58:23",
+    "notAfter": "2025-12-21 01:58:18",
+    "serialNumber": "13ff1180540f63250e61108c0bb0c044"
+  },
+  "contentInfo": {
+    "title": "The AI workspace that works for you. | Notion",
+    "favicon": "http://notion.com/favicon.ico",
+    "sha256": "3584d6ba19cfde8f8ded959fafef292a7f129159357c2939e6de6097f92c7afc",
+    "charset": "utf-8",
+    "mimeType": "text/html",
+    "metaTagCount": 20
+  },
+  "servicesKeyWords": [
+    "information",
+    "technology",
+    "advertisements"
   ],
   "suspiciousFeatures": [
-    "external-resources"
+    "multiple-redirects",
+    "iframes",
+    "third-party-cookies",
+    "external-resources",
+    "trackers"
   ],
   "externalResources": {
-    "linkedDomainsCount": 9,
-    "linkedDomainsEntropy": 3.5508,
-    "linkedDomainsSimilarity": 0.4277,
-    "embeddedUrlsCount": 67,
-    "embeddedUrlsEntropy": 4.4325,
-    "embeddedUrlsSimilarity": 0.405,
-    "trackers": []
+    "linkedDomainsCount": 23,
+    "linkedDomainsEntropy": 3.2062,
+    "linkedDomainsSimilarity": 0.279,
+    "embeddedUrlsCount": 75,
+    "embeddedUrlsEntropy": 4.6416,
+    "embeddedUrlsSimilarity": 0.2623,
+    "trackers": [
+      "Google Tag Manager",
+      "Facebook Connect",
+      "LinkedIn Insight Tag",
+      "Twitter Ads"
+    ]
   },
   "passiveDns": {
-    "totalResolutions": 40,
-    "firstSeen": "2019-12-09T00:04:13.000Z",
-    "lastSeen": "2025-09-17T21:36:52.000Z"
+    "totalResolutions": 28,
+    "firstSeen": "2014-03-05T00:00:00.000Z",
+    "lastSeen": "2024-12-13T16:05:10.000Z"
   }
 }
