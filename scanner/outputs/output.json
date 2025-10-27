@@ -1,121 +1,108 @@
 {
-  "scanId": "75d7e3196fd30edd9d6717119dc6716444d4ac67c22512373fcca9178144f6eb",
+  "scanId": "fff1ff2c374b0e2de2375086d67aa658b1365620f3eb53ee283f46c2ca531b40",
   "reputation": 0,
-  "url": "https://secure-netflix.com/captcha",
-  "hostname": "secure-netflix.com",
-  "path": "/captcha",
-  "finalUrl": "https://secure-netflix.com/captcha",
-  "urlEntropy": 4.1019,
+  "url": "https://lou-lab.com",
+  "urlEntropy": 3.8269,
+  "hostname": "lou-lab.com",
+  "path": "/",
   "redirectChain": [
-    "https://secure-netflix.com/captcha"
+    "https://lou-lab.com/"
   ],
   "redirectDepth": 1,
-  "redirectEntropy": 4.1019,
+  "redirectEntropy": 3.7842,
   "domain": {
-    "registrar": "absent",
-    "creationDate": "2024-12-06T00:00:00.000Z",
-    "expirationDate": "absent",
-    "domainAge": 322
+    "registrar": "NameCheap, Inc.",
+    "creationDate": "2025-07-03T19:13:12.000Z",
+    "expirationDate": "2030-07-03T19:13:12.000Z",
+    "domainAge": 115
   },
   "network": {
-    "ipAddress": "158.94.209.87",
-    "asn": "209800",
-    "asOwner": "metaspinner net GmbH",
-    "country": "TR",
-    "continent": "AS",
-    "city": "Seekamp 20",
-    "isp": "metaspinner net GmbH",
-    "hostingProvider": "metaspinner net GmbH"
+    "asn": "16509",
+    "asOwner": "AMAZON-02",
+    "country": "US"
   },
   "httpInfo": {
     "headers": {
-      "Date": "Fri, 24 Oct 2025 17:56:10 GMT",
-      "Server": "Apache",
-      "Last-Modified": "Tue, 01 Apr 2025 12:00:28 GMT",
-      "ETag": "\"1f4-631b6485b0f00-gzip\"",
-      "Accept-Ranges": "bytes",
-      "Vary": "Accept-Encoding",
-      "X-Powered-By": "PleskLin",
-      "Content-Length": "500",
-      "Keep-Alive": "timeout=5, max=99",
-      "Connection": "Keep-Alive",
-      "Content-Type": "text/html"
+      "date": "Mon, 20 Oct 2025 17:29:36 GMT",
+      "x-matched-path": "/",
+      "x-vercel-id": "sfo1::iad1::t8hxh-1760981408324-9114252cd4d0",
+      "strict-transport-security": "max-age=63072000",
+      "vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch",
+      "x-nextjs-stale-time": "300",
+      "cache-control": "public, max-age=0, must-revalidate",
+      "etag": "W/\"eckwgy290118py\"",
+      "x-nextjs-prerender": "1",
+      "x-powered-by": "Next.js",
+      "content-encoding": "br",
+      "server": "Vercel",
+      "x-vercel-cache": "STALE",
+      "age": "32",
+      "content-type": "text/html; charset=utf-8"
     },
     "statusCode": 200,
-    "contentLength": 500,
-    "serverInfo": "Apache",
-    "hsts": false
+    "contentLength": 57970,
+    "serverInfo": "Vercel",
+    "hsts": true
   },
   "tlsInfo": {
     "issuer": "R13",
-    "subject": "secure-netflix.com",
-    "validFrom": "2025-09-19 21:49:00",
-    "validTo": "2025-12-18 21:48:59",
-    "serialNumber": "55b9f363e19c6f5fb476892164ae6290a21",
+    "subject": "lou-lab.com",
+    "validFrom": "2025-09-16 01:47:28",
+    "validTo": "2025-12-15 01:47:27",
+    "serialNumber": "50d68ce07e4f6148cbf4fac3c6826222691",
     "sanEntries": [
-      "secure-netflix.com",
-      "www.secure-netflix.com"
+      "lou-lab.com"
     ],
-    "fingerprint": "089e0c456a80c039a1f35ec617ee26671d0f3976ee886c850c348d9281c16b79"
+    "fingerprint": "6b36e80e90f43ba73c04189f65a994fd3b0749806fbd30e2c453661230c18532"
   },
   "certificateInfo": {
     "issuerCN": "R13",
-    "subjectCN": "secure-netflix.com",
-    "notBefore": "2025-09-19 21:49:00",
-    "notAfter": "2025-12-18 21:48:59",
-    "serialNumber": "55b9f363e19c6f5fb476892164ae6290a21"
+    "subjectCN": "lou-lab.com",
+    "notBefore": "2025-09-16 01:47:28",
+    "notAfter": "2025-12-15 01:47:27",
+    "serialNumber": "50d68ce07e4f6148cbf4fac3c6826222691"
   },
   "contentInfo": {
-    "title": "absent",
-    "favicon": "https://secure-netflix.com/favicon.ico",
-    "sha256": "809084d1d2c8844b9220dd78aaa9709e791ecd8155cccaec1cef0fe08c3af36f",
-    "contentEntropy": 3.8146
+    "title": "Lou Research Lab",
+    "favicon": "https://lou-lab.com/favicon.ico",
+    "sha256": "10cc32d0afefcf60ebed060ac22875b51e240d01baa44dc4e044b5ed63f3e80f",
+    "contentEntropy": 3.7572
   },
   "detectionVotes": {
-    "malicious": 17,
+    "malicious": 0,
     "suspicious": 0,
-    "harmless": 54,
-    "undetected": 27
+    "harmless": 66,
+    "undetected": 32
   },
-  "threatCategories": [
-    "Phishing (alphaMountain.ai)",
-    "phishing and fraud",
-    "Phishing and Other Frauds",
-    "phishing and other frauds"
-  ],
+  "threatCategories": [],
   "suspiciousFeatures": [],
   "externalResources": {
-    "linkedDomains": "absent",
-    "embeddedUrls": [],
-    "externalScripts": "absent",
+    "linkedDomains": [
+      "olemiss.edu",
+      "cdn.sanity.io"
+    ],
+    "embeddedUrls": [
+      "https://olemiss.edu/research/",
+      "https://olemiss.edu/",
+      "https://cdn.sanity.io/images/qort1r0u/production/492eb80364e32200b94f5a81bfbf1786b7ebec31-500x500.png",
+      "https://cdn.sanity.io/images/qort1r0u/production/6e102e5e0896eeb324c9a04246a454c77e3216a9-3840x2160.png",
+      "https://cdn.sanity.io/images/qort1r0u/production/d36a3ad794ca6d42974654323cff00c9fd5f7f9f-1920x480.webp",
+      "https://cdn.sanity.io/images/qort1r0u/production/28cd4ccad119d8d5170d07d37851f3ebb41e107f-5016x3344.jpg",
+      "https://cdn.sanity.io/images/qort1r0u/production/569c85bedf075f48ddf0b32ecc7dd07d8c18d982-3840x2160.jpg",
+      "https://cdn.sanity.io/images/qort1r0u/production/781f85cfacc3ab51f9e52de2b86e7425626db74c-2048x1150.jpg",
+      "https://cdn.sanity.io/images/qort1r0u/production/227087bdd251d12e25bb75bd6a3d9ad1c55c6d2c-200x200.jpg",
+      "https://cdn.sanity.io/images/qort1r0u/production/82a1cc15996ebf94608c2d0f315c20987082c3a7-200x200.jpg",
+      "https://cdn.sanity.io/images/qort1r0u/production/f980d9763bf3106d52411559c02b1f61929891dc-200x200.jpg"
+    ],
     "trackers": []
-  },
-  "behaviorInfo": {
-    "javascriptActivity": false,
-    "dataUriUsage": false,
-    "hiddenElements": false
   },
   "passiveDns": {
     "distinctIps": [
-      "158.94.209.87",
-      "213.209.150.118",
-      "94.156.177.79",
-      "154.216.20.243",
-      "104.21.84.104",
-      "172.67.191.17",
-      "15.236.239.104",
-      "172.67.155.78",
-      "104.21.66.19",
-      "185.230.60.173",
-      "185.230.61.173",
-      "23.236.62.147",
-      "91.195.240.117",
-      "52.17.250.95",
-      "54.36.113.141",
-      "5.196.141.83"
+      "216.198.79.1",
+      "192.64.119.86"
     ],
-    "totalResolutions": 16,
-    "firstSeen": "2014-10-23T00:00:00.000Z",
-    "lastSeen": "2025-09-28T09:25:18.000Z"
+    "totalResolutions": 2,
+    "firstSeen": "2025-07-06T05:33:09.000Z",
+    "lastSeen": "2025-09-03T01:22:09.000Z"
   }
 }

@@ -17,10 +17,11 @@ export interface VTURLMetadata {
 
   // Basic URL info
   url: string;
+  urlEntropy?: number;
+
   hostname: string;
   path: string;
-  finalUrl?: string;
-  urlEntropy?: number;
+
   redirectChain?: string[];
   redirectDepth: number;
   redirectEntropy?: number;
@@ -35,14 +36,9 @@ export interface VTURLMetadata {
 
   // Network and hosting info
   network: {
-    ipAddress?: string;
     asn?: string;
     asOwner?: string;
     country?: string;
-    continent?: string;
-    city?: string;
-    isp?: string;
-    hostingProvider?: string;
   };
 
   // HTTP response info
@@ -94,15 +90,7 @@ export interface VTURLMetadata {
   externalResources: {
     linkedDomains?: string[];
     embeddedUrls?: string[];
-    externalScripts?: string[];
     trackers?: string[];
-  };
-
-  // Behavioral indicators
-  behaviorInfo: {
-    javascriptActivity?: boolean | null;
-    dataUriUsage?: boolean;
-    hiddenElements?: boolean;
   };
 
   // Passive DNS and historical data
@@ -205,9 +193,6 @@ export interface VTDomainResponse {
         harmless: number;
         undetected: number;
       };
-      isp?: string;
-      hosting_provider?: string;
-      city?: string;
     };
   };
 }
@@ -217,15 +202,10 @@ export interface VTIPResponse {
     id: string;
     type: string;
     attributes: {
-      ip_address?: string;
       network?: string;
       asn?: number;
       as_owner?: string;
       country?: string;
-      continent?: string;
-      city?: string;
-      isp?: string;
-      hosting_provider?: string;
       regional_internet_registry?: string;
       whois?: string;
       whois_date?: number;
@@ -241,18 +221,12 @@ export interface VTIPResponse {
 }
 
 export interface GeoIPResponse {
-  ip?: string;
   country_code?: string;
   country_name?: string;
-  region_code?: string;
-  region_name?: string;
-  city?: string;
-  zip_code?: string;
   time_zone?: string;
   latitude?: number;
   longitude?: number;
   metro_code?: number;
-  isp?: string;
   organization?: string;
   as?: string;
   asname?: string;
@@ -260,6 +234,7 @@ export interface GeoIPResponse {
 
 // ===== scanner.tsx (kept in full) =====
 import fs from "fs";
+import { getDomain as tldGetDomain } from "tldts";
 
 const ABSENT = "absent";
 const ERROR = "error";
@@ -283,7 +258,7 @@ function appendToWaitlist(url: string, note?: string) {
     const line = `${new Date().toISOString()}\t${url}${
       note ? `\t${note}` : ""
     }\n`;
-    fs.appendFileSync("waitlist.txt", line, { encoding: "utf-8" });
+    fs.appendFileSync("./outputs/waitlist.txt", line, { encoding: "utf-8" });
   } catch (e) {
     // best-effort; do not crash if we can't write the waitlist
   }
@@ -359,7 +334,8 @@ async function submitUrl(url: string) {
 
 async function fetchDomainInfo(hostname: string) {
   try {
-    const domainResp: VTDomainResponse = await vtGet(`/domains/${hostname}`);
+    const base = getRegistrableDomain(hostname) || hostname;
+    const domainResp: VTDomainResponse = await vtGet(`/domains/${base}`);
     const attr = domainResp?.data?.attributes ?? {};
     const registrar = attr.registrar;
     const creationDate = attr.creation_date
@@ -384,6 +360,7 @@ async function fetchDomainInfo(hostname: string) {
       if (a?.value) firstA = String(a.value);
     }
     return {
+      _queriedBase: base,
       registrar,
       creationDate,
       expirationDate,
@@ -393,6 +370,7 @@ async function fetchDomainInfo(hostname: string) {
     } as any;
   } catch {
     return {
+      _queriedBase: getRegistrableDomain(hostname) || hostname,
       registrar: ERROR,
       creationDate: ERROR,
       expirationDate: ERROR,
@@ -407,21 +385,9 @@ async function fetchIPInfo(ip: string): Promise<VTURLMetadata["network"]> {
   try {
     const ipResp: VTIPResponse = await vtGet(`/ip_addresses/${ip}`);
     const attr = ipResp?.data?.attributes ?? {};
-
-    // Start with VT-provided country; if missing, try to parse from WHOIS text
     let country: string | undefined = attr.country || undefined;
-    let continent: string | undefined = attr.continent || undefined;
-
-    // Derive ISP/hosting from VT fields with sensible fallbacks
     const asOwner = attr.as_owner || undefined;
-    const isp = attr.isp || asOwner || undefined;
-    const hostingProvider =
-      attr.hosting_provider || isp || asOwner || undefined;
-
-    // Best-effort city extraction from WHOIS text (VT-only, no external lookups)
     const whoisText = typeof attr.whois === "string" ? attr.whois : undefined;
-    let city: string | undefined =
-      attr.city || extractCityFromWhoisText(whoisText);
 
     // Extract country code/name from WHOIS if VT didn't provide it
     if (!country && whoisText) {
@@ -440,90 +406,16 @@ async function fetchIPInfo(ip: string): Promise<VTURLMetadata["network"]> {
       }
     }
 
-    // Derive continent from country code if needed
-    if (!continent && country) {
-      const cc = country.toUpperCase();
-      const map: Record<string, string> = {
-        US: "NA",
-        CA: "NA",
-        MX: "NA",
-        BR: "SA",
-        AR: "SA",
-        CL: "SA",
-        CO: "SA",
-        PE: "SA",
-        GB: "EU",
-        UK: "EU",
-        IE: "EU",
-        FR: "EU",
-        DE: "EU",
-        ES: "EU",
-        IT: "EU",
-        NL: "EU",
-        BE: "EU",
-        SE: "EU",
-        NO: "EU",
-        DK: "EU",
-        FI: "EU",
-        PL: "EU",
-        PT: "EU",
-        CZ: "EU",
-        AT: "EU",
-        CH: "EU",
-        RU: "EU",
-        UA: "EU",
-        RO: "EU",
-        HU: "EU",
-        GR: "EU",
-        TR: "AS",
-        SA: "AS",
-        AE: "AS",
-        IL: "AS",
-        QA: "AS",
-        KW: "AS",
-        CN: "AS",
-        JP: "AS",
-        KR: "AS",
-        IN: "AS",
-        SG: "AS",
-        HK: "AS",
-        TW: "AS",
-        TH: "AS",
-        MY: "AS",
-        ID: "AS",
-        PH: "AS",
-        VN: "AS",
-        AU: "OC",
-        NZ: "OC",
-        ZA: "AF",
-        NG: "AF",
-        EG: "AF",
-        KE: "AF",
-        MA: "AF",
-      };
-      continent = map[cc] || undefined;
-    }
-
     return {
-      ipAddress: attr.ip_address || ip,
       asn: attr.asn ? String(attr.asn) : undefined,
       asOwner,
       country,
-      continent,
-      city,
-      isp,
-      hostingProvider,
     };
   } catch {
     return {
-      ipAddress: ERROR as any,
       asn: ERROR as any,
       asOwner: ERROR as any,
       country: ERROR as any,
-      continent: ERROR as any,
-      city: ERROR as any,
-      isp: ERROR as any,
-      hostingProvider: ERROR as any,
     };
   }
 }
@@ -795,10 +687,33 @@ async function fetchContactedIPsFromUrl(urlId: string): Promise<string[]> {
   }
 }
 
+// Fetch contacted domains from URL relationships
+async function fetchContactedDomainsFromUrl(urlId: string): Promise<string[]> {
+  try {
+    const rel = await vtGet(
+      `/urls/${urlId}/relationships/contacted_domains?limit=40`
+    );
+    const items = Array.isArray(rel?.data) ? rel.data : [];
+    return items.map((x: any) => x?.id).filter(Boolean);
+  } catch (e: any) {
+    dlog("contacted_domains rel fetch failed:", e?.message || String(e));
+    return [];
+  }
+}
+
 // Try toggling www. variant of hostname to increase hit rate
 function toggleWww(host: string): string {
   if (host.startsWith("www.")) return host.slice(4);
   return `www.${host}`;
+}
+
+function getRegistrableDomain(hostname: string): string {
+  try {
+    const base = tldGetDomain(hostname, { allowPrivateDomains: true });
+    return base || hostname;
+  } catch {
+    return hostname;
+  }
 }
 
 // ---- Passive DNS helpers ----
@@ -915,8 +830,7 @@ async function buildVTMetadata(
     hsts: hsts || false,
   };
 
-  // Redirect info (define early so contentInfo/behaviorInfo can use it)
-  const finalUrl = attr.last_final_url ?? undefined;
+  // Redirect info (define early so contentInfo can use it)
   const redirectChain: string[] = Array.isArray(attr.redirection_chain)
     ? attr.redirection_chain
     : [];
@@ -935,7 +849,7 @@ async function buildVTMetadata(
   } else if (typeof headers?.["ETag"] === "string") {
     entropySource = String(headers["ETag"]);
   } else {
-    entropySource = [finalUrl || url, ...redirectChain].join("|");
+    entropySource = [url, ...redirectChain].join("|");
   }
   const contentEntropy = normalizedEntropy(entropySource || "");
 
@@ -945,13 +859,13 @@ async function buildVTMetadata(
     const linkHeader = (headers?.["link"] || headers?.["Link"]) as
       | string
       | undefined;
-    const iconFromLink = extractIconFromLinkHeader(linkHeader, finalUrl || url);
+    const iconFromLink = extractIconFromLinkHeader(linkHeader, url);
     if (iconFromLink) favicon = iconFromLink;
   }
   if (!favicon) {
     try {
       // Heuristic only; does not fetch, just fills a reasonable default
-      const base = new URL(finalUrl || url);
+      const base = new URL(url);
       favicon = `${base.protocol}//${base.host}/favicon.ico`;
     } catch {}
   }
@@ -969,6 +883,14 @@ async function buildVTMetadata(
     sha256: attr.last_http_response_content_sha256 ?? undefined,
     contentEntropy,
   };
+
+  // Fetch domain early so baseDomain is available for certificate fallbacks and network
+  const domain = await fetchDomainInfo(hostname);
+  dlog(
+    "domain _lastHttpsCert present:",
+    Boolean((domain as any)?._lastHttpsCert)
+  );
+  const baseDomain = (domain as any)?._queriedBase || hostname;
 
   // Certificate Info: multiple strategies
   let certAttributes: any | undefined = undefined;
@@ -996,8 +918,20 @@ async function buildVTMetadata(
     );
     if (relAttr) certAttributes = relAttr;
   }
+  if (!certAttributes && baseDomain && baseDomain !== hostname) {
+    try {
+      const relBase = await fetchCertificateFromRelationships(
+        baseDomain,
+        undefined
+      );
+      if (relBase) certAttributes = relBase;
+    } catch (e: any) {
+      if (!isForbidden(e))
+        dlog("baseDomain rel fetch failed:", e?.message || String(e));
+    }
+  }
 
-  // 3) If finalUrl has a different hostname, try that too
+  // 3) If final Url has a different hostname, try that too
   if (!certAttributes && attr.last_final_url) {
     try {
       const finalHost = new URL(attr.last_final_url).hostname;
@@ -1103,24 +1037,44 @@ async function buildVTMetadata(
     ? (attr.outgoing_links as string[])
     : [];
 
+  // Build linked domains from multiple sources (relationships + outgoing_links + redirects)
+  const linkedHostSet = new Set<string>();
+
+  // a) Contacted domains via URL relationships (best signal)
+  try {
+    const urlId = encodeVTUrl(targetUrl);
+    const relDomains = await fetchContactedDomainsFromUrl(urlId);
+    for (const d of relDomains) {
+      if (d && typeof d === "string") linkedHostSet.add(d.toLowerCase());
+    }
+  } catch {}
+
+  // b) Hosts from outgoing_links
+  for (const u of embeddedUrls) {
+    try {
+      const h = new URL(u).hostname.toLowerCase();
+      if (h) linkedHostSet.add(h);
+    } catch {}
+  }
+
+  // c) Hosts from redirect chain
+  for (const u of redirectChain) {
+    try {
+      const h = new URL(u).hostname.toLowerCase();
+      if (h) linkedHostSet.add(h);
+    } catch {}
+  }
+
+  // Remove the page's own hostname from linked domains
+  linkedHostSet.delete(hostname.toLowerCase());
+
+  const linkedDomains = Array.from(linkedHostSet);
+
   const externalResources = {
-    linkedDomains: undefined,
+    linkedDomains: linkedDomains.length ? linkedDomains : undefined,
     embeddedUrls,
-    externalScripts: undefined,
     trackers,
   };
-
-  // Behavior Info — derive basic booleans from VT attributes
-  const ctLower = (
-    headers?.["content-type"] ||
-    headers?.["Content-Type"] ||
-    ""
-  ).toLowerCase();
-  const javascriptActivity = Boolean(
-    ctLower.includes("javascript") ||
-      ctLower.includes("json") ||
-      (Array.isArray(trackers) && trackers.length > 0)
-  );
 
   const redirectHosts = redirectChain
     .map((u: string) => {
@@ -1132,20 +1086,6 @@ async function buildVTMetadata(
     })
     .filter((h: string | null): h is string => Boolean(h));
   const distinctRedirectHosts = new Set(redirectHosts).size;
-  const dataUriUsage = Array.isArray(embeddedUrls)
-    ? embeddedUrls.some(
-        (u: string) => typeof u === "string" && u.startsWith("data:")
-      )
-    : false;
-
-  // "hiddenElements" cannot be observed from VT URL fetches (no DOM). Default to false.
-  const hiddenElements = false;
-
-  const behaviorInfo = {
-    javascriptActivity,
-    dataUriUsage,
-    hiddenElements,
-  };
 
   // Passive DNS
   let passiveDns: VTURLMetadata["passiveDns"] | undefined = undefined;
@@ -1171,13 +1111,6 @@ async function buildVTMetadata(
       }
     }
   } catch {}
-
-  // Domain info (moved earlier so we can use _firstA as a fallback for network)
-  const domain = await fetchDomainInfo(hostname);
-  dlog(
-    "domain _lastHttpsCert present:",
-    Boolean((domain as any)?._lastHttpsCert)
-  );
 
   // Decide serving IP using multiple fallbacks
   let servingIp: string | undefined =
@@ -1213,27 +1146,17 @@ async function buildVTMetadata(
 
   // Build network object with all keys present so deepMarkAbsent won't leave `{}`
   let network: VTURLMetadata["network"] = {
-    ipAddress: undefined,
     asn: undefined,
     asOwner: undefined,
     country: undefined,
-    continent: undefined,
-    city: undefined,
-    isp: undefined,
-    hostingProvider: undefined,
   };
 
   if (servingIp) {
     const ipInfo = await fetchIPInfo(servingIp);
     network = {
-      ipAddress: servingIp,
       asn: ipInfo.asn,
       asOwner: ipInfo.asOwner,
       country: ipInfo.country,
-      continent: ipInfo.continent,
-      city: ipInfo.city,
-      isp: ipInfo.isp,
-      hostingProvider: ipInfo.hostingProvider,
     };
   }
 
@@ -1379,42 +1302,28 @@ async function buildVTMetadata(
   const metadata: VTURLMetadata = {
     scanId: vtUrlPayload?.data?.id,
     reputation: attr.reputation ?? undefined,
-
     url,
+    urlEntropy,
     hostname,
     path,
-    finalUrl,
-    urlEntropy,
     redirectChain,
     redirectDepth,
     redirectEntropy,
-
     domain: {
       registrar: domain.registrar,
       creationDate: domain.creationDate,
       expirationDate: domain.expirationDate,
       domainAge: domain.domainAge,
     },
-
     network,
-
     httpInfo,
-
     tlsInfo,
-
     certificateInfo,
-
     contentInfo,
-
     detectionVotes,
-
     threatCategories,
     suspiciousFeatures,
-
     externalResources,
-
-    behaviorInfo,
-
     passiveDns,
   };
 
