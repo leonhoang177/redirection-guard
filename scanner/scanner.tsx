@@ -11,18 +11,15 @@ function isForbidden(err: any): boolean {
 }
 // Enhanced VirusTotal API Response Types with comprehensive metadata
 export interface VTURLMetadata {
-  // Metadata
+  // Basic URL info
   scanId?: string;
   reputation?: number;
-
-  // Basic URL info
   url: string;
   urlEntropy?: number;
-
   hostname: string;
   path: string;
 
-  // redirectChain?: string[];
+  // Redirection
   redirect?: {
     count: number;
     entropy?: number;
@@ -67,16 +64,16 @@ export interface VTURLMetadata {
     sanEntriesSimilarity?: number;
   };
 
-  /** Parsed TLS certificate summary (from attributes.last_https_certificate) */
+  /** Certificate */
   certificateInfo?: {
     issuerCN?: string;
     subjectCN?: string;
-    notBefore?: string; // ISO 8601
-    notAfter?: string; // ISO 8601
+    notBefore?: string;
+    notAfter?: string;
     serialNumber?: string;
   };
 
-  // Content and security analysis
+  // Content Info
   contentInfo: {
     title?: string;
     favicon?: string;
@@ -86,31 +83,29 @@ export interface VTURLMetadata {
     metaTagCount?: number;
   };
 
-  // Detection and threat info
+  // Detection Vote
   detectionVotes: DetectionStats;
   servicesKeyWords?: string[];
-  malwareFamily?: string[];
-  impersonatedBrand?: string;
   suspiciousFeatures?: string[];
 
-  // External resources and links
+  // External Resources
   externalResources: {
     linkedDomains?: string[];
     linkedDomainsCount?: number;
     linkedDomainsEntropy?: number;
     linkedDomainsSimilarity?: number;
     embeddedUrls?: string[];
-    trackers?: string[];
     embeddedUrlsCount?: number;
     embeddedUrlsEntropy?: number;
     embeddedUrlsSimilarity?: number;
+    trackers?: string[];
   };
 
   // Passive DNS and historical data
   passiveDns?: {
+    totalResolutions?: number;
     firstSeen?: string;
     lastSeen?: string;
-    totalResolutions?: number;
   };
 }
 
@@ -120,72 +115,6 @@ export interface DetectionStats {
   harmless: number;
   undetected: number;
 }
-
-// VirusTotal API Response interfaces
-export interface VTURLResponse {
-  data: {
-    id: string;
-    type: string;
-    attributes: VTURLAttributes;
-    relationships?: {
-      network_location?: { data: { id: string; type: string } };
-      contacted_domains?: { data: Array<{ id: string; type: string }> };
-      contacted_ips?: { data: Array<{ id: string; type: string }> };
-    };
-  };
-}
-
-export interface VTURLAttributes {
-  // HTTP info
-  last_http_response_code?: number;
-  last_http_response_headers?: Record<string, string>;
-  last_http_response_content_sha256?: string;
-  last_http_response_content_length?: number;
-  last_serving_ip_address?: string;
-
-  // Redirect info
-  last_final_url?: string;
-  redirection_chain?: string[];
-
-  // Content info
-  title?: string;
-  favicon?: string;
-
-  // Categories and tags
-  categories?: Record<string, string>;
-  tags?: string[];
-
-  // Trackers and external resources
-  trackers?: Record<string, any>[];
-  outgoing_links?: string[];
-
-  // Timestamps
-  first_submission_date?: number;
-  last_analysis_date?: number;
-  last_modification_date?: number;
-
-  // Additional attributes
-  threat_names?: string[];
-  popular_threat_name?: string;
-  targeted_brand?: string;
-
-  total_votes?: {
-    harmless: number;
-    malicious: number;
-  };
-
-  last_https_certificate?: {
-    issuer?: { CN?: string };
-    subject?: { CN?: string };
-    validity?: { not_before?: string; not_after?: string };
-    serial_number?: string;
-  };
-
-  reputation?: number;
-  times_submitted?: number;
-  last_submission_date?: number;
-}
-
 export interface VTDomainResponse {
   data: {
     id: string;
@@ -195,16 +124,6 @@ export interface VTDomainResponse {
       creation_date?: number;
       last_update_date?: number;
       expiration_date?: number;
-      whois?: string;
-      whois_date?: number;
-      categories?: Record<string, string>;
-      reputation?: number;
-      last_analysis_stats?: {
-        malicious: number;
-        suspicious: number;
-        harmless: number;
-        undetected: number;
-      };
     };
   };
 }
@@ -214,34 +133,12 @@ export interface VTIPResponse {
     id: string;
     type: string;
     attributes: {
-      network?: string;
       asn?: number;
       as_owner?: string;
       country?: string;
-      regional_internet_registry?: string;
       whois?: string;
-      whois_date?: number;
-      reputation?: number;
-      last_analysis_stats?: {
-        malicious: number;
-        suspicious: number;
-        harmless: number;
-        undetected: number;
-      };
     };
   };
-}
-
-export interface GeoIPResponse {
-  country_code?: string;
-  country_name?: string;
-  time_zone?: string;
-  latitude?: number;
-  longitude?: number;
-  metro_code?: number;
-  organization?: string;
-  as?: string;
-  asname?: string;
 }
 
 // ===== scanner.tsx (kept in full) =====
@@ -279,9 +176,7 @@ function appendToWaitlist(url: string, note?: string) {
 const API_KEY =
   "1d0b32a0630fc45fc0f7ef17c35421d2f56d961f97fcca7a9a135b4235268bf9";
 const BASE = "https://www.virustotal.com/api/v3";
-const HARDCODED_URL = "https://www.apple.com/"; // <--- change to your target
-const POLL_INTERVAL_MS = 1500; // VT is rate-limited; be gentle
-const POLL_TIMEOUT_MS = 60_000; // stop after 60s
+const HARDCODED_URL = "https://www.apple.com/";
 
 if (!API_KEY) {
   console.error("Missing VT_API_KEY env var.");

@@ -1,103 +1,96 @@
 {
-  "scanId": "8732e86844cb2ae7df3238452dc7d58c375ff9bb6600fdfec65751933931de10",
-  "reputation": 0,
-  "url": "http://notion.com",
-  "urlEntropy": 3.2928,
-  "hostname": "notion.com",
+  "scanId": "20cd847063ed3a949dc38caf3629eb46d0a45eddd955cdb9fa935943497e6ff4",
+  "reputation": 86,
+  "url": "http://apple.com",
+  "urlEntropy": 3.4528,
+  "hostname": "apple.com",
   "path": "/",
   "redirect": {
     "count": 2,
-    "entropy": 3.3291,
-    "similarity": 0.9474
+    "entropy": 3.4705,
+    "similarity": 0.9444
   },
   "detectionVotes": {
     "malicious": 0,
     "suspicious": 0,
-    "harmless": 70,
-    "undetected": 28
+    "harmless": 71,
+    "undetected": 27
   },
   "domain": {
-    "registrar": "Amazon Registrar, Inc.",
-    "creationDate": "1997-10-06T04:00:00.000Z",
-    "expirationDate": "2033-10-05T04:00:00.000Z",
-    "domainAge": 10248
+    "registrar": "NOM-IQ Ltd dba Com Laude",
+    "creationDate": "1987-02-19T05:00:00.000Z",
+    "expirationDate": "2026-02-20T05:00:00.000Z",
+    "domainAge": 14130
   },
   "network": {
-    "asn": "33191",
-    "asOwner": "NOTION",
+    "asn": "714",
+    "asOwner": "APPLE-ENGINEERING",
     "country": "US"
   },
   "httpInfo": {
     "headers": {
-      "content-security-policy-count": 40,
-      "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-      "x-frame-options": null,
-      "x-content-type-options": null,
-      "referrer-policy": "strict-origin-when-cross-origin",
-      "server": "cloudflare",
-      "cache-control": "public, max-age=0",
-      "x-powered-by": "Next.js"
+      "content-security-policy-count": 41,
+      "strict-transport-security": "max-age=31536000; includeSubdomains; preload",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "referrer-policy": "no-referrer-when-downgrade",
+      "server": "Apple",
+      "cache-control": "max-age=217",
+      "x-powered-by": null
     },
     "statusCode": 200,
-    "contentLength": 172153,
-    "serverInfo": "cloudflare",
+    "contentLength": 187797,
+    "serverInfo": "Apple",
     "hsts": true
   },
   "tlsInfo": {
-    "issuer": "WE1",
-    "subject": "notion.com",
-    "validFrom": "2025-09-22 00:58:23",
-    "validTo": "2025-12-21 01:58:18",
-    "serialNumber": "13ff1180540f63250e61108c0bb0c044",
-    "fingerprint": "b0548e9210dc7139405c2aca47f80f56b554bc2f1bac4657dd7abd4d8386a8ca",
-    "sanEntriesCount": 2,
-    "sanEntriesEntropy": 2.7509,
-    "sanEntriesSimilarity": 0.8333
+    "issuer": "Apple Public EV Server ECC CA 1 - G1",
+    "subject": "apple.com",
+    "validFrom": "2025-10-01 15:23:49",
+    "validTo": "2025-12-17 18:31:49",
+    "serialNumber": "47345b6286841cf112635533c4f2f506",
+    "fingerprint": "7fc3bf396e0a5b20b86dfba2d9c20ebfbc5224ecd53e738952b3edeb4f262535",
+    "sanEntriesCount": 1,
+    "sanEntriesEntropy": 2.9477,
+    "sanEntriesSimilarity": 1
   },
   "certificateInfo": {
-    "issuerCN": "WE1",
-    "subjectCN": "notion.com",
-    "notBefore": "2025-09-22 00:58:23",
-    "notAfter": "2025-12-21 01:58:18",
-    "serialNumber": "13ff1180540f63250e61108c0bb0c044"
+    "issuerCN": "Apple Public EV Server ECC CA 1 - G1",
+    "subjectCN": "apple.com",
+    "notBefore": "2025-10-01 15:23:49",
+    "notAfter": "2025-12-17 18:31:49",
+    "serialNumber": "47345b6286841cf112635533c4f2f506"
   },
   "contentInfo": {
-    "title": "The AI workspace that works for you. | Notion",
-    "favicon": "http://notion.com/favicon.ico",
-    "sha256": "3584d6ba19cfde8f8ded959fafef292a7f129159357c2939e6de6097f92c7afc",
+    "title": "Apple",
+    "favicon": "http://apple.com/favicon.ico",
+    "sha256": "db0414172d48a48ee6bc505b588a73a2325623fe5ef428ca0554f66efd03938c",
     "charset": "utf-8",
     "mimeType": "text/html",
-    "metaTagCount": 20
+    "metaTagCount": 15
   },
   "servicesKeyWords": [
-    "information",
     "technology",
-    "advertisements"
+    "information",
+    "alphamountain.ai"
   ],
   "suspiciousFeatures": [
     "multiple-redirects",
     "iframes",
-    "third-party-cookies",
-    "external-resources",
-    "trackers"
+    "external-resources"
   ],
   "externalResources": {
-    "linkedDomainsCount": 23,
-    "linkedDomainsEntropy": 3.2062,
-    "linkedDomainsSimilarity": 0.279,
-    "embeddedUrlsCount": 75,
-    "embeddedUrlsEntropy": 4.6416,
-    "embeddedUrlsSimilarity": 0.2623,
-    "trackers": [
-      "Google Tag Manager",
-      "Facebook Connect",
-      "LinkedIn Insight Tag",
-      "Twitter Ads"
-    ]
+    "linkedDomainsCount": 17,
+    "linkedDomainsEntropy": 3.2736,
+    "linkedDomainsSimilarity": 0.4875,
+    "embeddedUrlsCount": 100,
+    "embeddedUrlsEntropy": 4.4332,
+    "embeddedUrlsSimilarity": 0.3063,
+    "trackers": []
   },
   "passiveDns": {
-    "totalResolutions": 28,
-    "firstSeen": "2014-03-05T00:00:00.000Z",
-    "lastSeen": "2024-12-13T16:05:10.000Z"
+    "totalResolutions": 26,
+    "firstSeen": "2013-10-15T00:00:00.000Z",
+    "lastSeen": "2025-09-17T23:20:21.000Z"
   }
 }
