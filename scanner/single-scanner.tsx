@@ -21,9 +21,9 @@ export interface VTURLMetadata {
 
   // Redirection
   redirect?: {
-    count: number;
-    entropy?: number;
-    similarity?: number;
+    count: number | null;
+    entropy?: number | null;
+    similarity?: number | null;
   };
 
   // Domain info
@@ -59,9 +59,9 @@ export interface VTURLMetadata {
     validTo: string;
     serialNumber: string;
     fingerprint?: string;
-    sanEntriesCount?: number;
-    sanEntriesEntropy?: number;
-    sanEntriesSimilarity?: number;
+    sanEntriesCount?: number | null;
+    sanEntriesEntropy?: number | null;
+    sanEntriesSimilarity?: number | null;
   };
 
   /** Certificate */
@@ -85,20 +85,20 @@ export interface VTURLMetadata {
 
   // Detection Vote
   detectionVotes: DetectionStats;
-  servicesKeyWords?: string[];
-  suspiciousFeatures?: string[];
+  servicesKeyWords?: string;
+  suspiciousFeatures?: string;
 
   // External Resources
   externalResources: {
     linkedDomains?: string[];
-    linkedDomainsCount?: number;
-    linkedDomainsEntropy?: number;
-    linkedDomainsSimilarity?: number;
+    linkedDomainsCount?: number | null;
+    linkedDomainsEntropy?: number | null;
+    linkedDomainsSimilarity?: number | null;
     embeddedUrls?: string[];
-    embeddedUrlsCount?: number;
-    embeddedUrlsEntropy?: number;
-    embeddedUrlsSimilarity?: number;
-    trackers?: string[];
+    embeddedUrlsCount?: number | null;
+    embeddedUrlsEntropy?: number | null;
+    embeddedUrlsSimilarity?: number | null;
+    trackers?: string;
   };
 
   // Passive DNS and historical data
@@ -158,6 +158,35 @@ function deepMarkAbsent(value: any): any {
     return out;
   }
   return value;
+}
+
+function capitalizeKeySegment(segment: string): string {
+  if (!segment) return segment;
+  return segment[0].toUpperCase() + segment.slice(1);
+}
+
+function isPlainObject(value: any): value is Record<string, any> {
+  if (value === null || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function flattenObject(
+  value: Record<string, any>,
+  parentKey = ""
+): Record<string, any> {
+  const flat: Record<string, any> = {};
+  for (const [key, current] of Object.entries(value)) {
+    const nextKey = parentKey
+      ? `${parentKey}${capitalizeKeySegment(key)}`
+      : key;
+    if (isPlainObject(current)) {
+      Object.assign(flat, flattenObject(current, nextKey));
+    } else {
+      flat[nextKey] = current;
+    }
+  }
+  return flat;
 }
 
 // Helper: Append a failed URL to a waitlist file (best-effort)
@@ -527,8 +556,8 @@ function normalizedEntropy(s: string): number {
 }
 
 // Simple redirect similarity metric: average normalized Levenshtein similarity between all URLs
-function redirectSimilarity(urls: string[]): number {
-  if (!Array.isArray(urls) || urls.length < 2) return 1;
+function avgSimilarity(urls: string[]): number {
+  if (!Array.isArray(urls) || urls.length < 2) return -1;
   function levenshteinSim(a: string, b: string): number {
     const m = a.length,
       n = b.length;
@@ -560,8 +589,8 @@ function redirectSimilarity(urls: string[]): number {
   return Number((sum / pairs).toFixed(4));
 }
 
-function averageStringEntropy(values: string[]): number {
-  if (!Array.isArray(values) || values.length === 0) return 0;
+function avgEntropy(values: string[]): number {
+  if (!Array.isArray(values) || values.length === 0) return -1;
   const avg =
     values.reduce(
       (sum, v) => sum + normalizedEntropy(String(v).toLowerCase()),
@@ -670,6 +699,23 @@ function getHeaderCI(
   const target = name.toLowerCase();
   for (const k of Object.keys(headers)) {
     if (k.toLowerCase() === target) return (headers as any)[k];
+  }
+  return undefined;
+}
+
+function getHeaderValuesCI(
+  headers: Record<string, unknown> | undefined,
+  name: string
+): string[] | null | undefined {
+  if (!headers) return undefined;
+  const target = name.toLowerCase();
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === target) {
+      const value = (headers as any)[key];
+      if (value == null) return value;
+      if (Array.isArray(value)) return value.map((v) => String(v));
+      return [String(value)];
+    }
   }
   return undefined;
 }
@@ -824,11 +870,13 @@ async function buildVTMetadata(
 
   // HTTP Info (only top-8 selected headers kept in `headers`)
   const rawHeaders = attr.last_http_response_headers ?? {};
+  const cspValues = getHeaderValuesCI(rawHeaders, "content-security-policy");
+
   const selectedMaybe: Record<string, string | undefined> = {
-    "content-security-policy": getHeaderCI(
-      rawHeaders,
-      "content-security-policy"
-    ),
+    "content-security-policy":
+      Array.isArray(cspValues) && cspValues.length > 0
+        ? cspValues[0]
+        : undefined,
     "strict-transport-security": getHeaderCI(
       rawHeaders,
       "strict-transport-security"
@@ -850,16 +898,20 @@ async function buildVTMetadata(
 
   // Count tokens in Content-Security-Policy using delimiters: space and semicolon,
   // and ensure the count key appears FIRST in the final headers object.
-  const _csp = tempHeaders["content-security-policy"] as
-    | string
-    | null
-    | undefined;
-  const contentSecurityPolicyCount = _csp
-    ? String(_csp)
+  let contentSecurityPolicyCount: number | null;
+  if (cspValues == null) {
+    contentSecurityPolicyCount = null;
+  } else if (cspValues.length === 0) {
+    contentSecurityPolicyCount = 0;
+  } else {
+    const tokens = cspValues.flatMap((value) =>
+      String(value)
         .split(/[ ;]+/)
         .map((t) => t.trim())
-        .filter(Boolean).length
-    : 0;
+        .filter(Boolean)
+    );
+    contentSecurityPolicyCount = tokens.length;
+  }
   delete tempHeaders["content-security-policy"]; // remove raw CSP value
 
   // Rebuild headers with CSP count first
@@ -867,6 +919,14 @@ async function buildVTMetadata(
     "content-security-policy-count": contentSecurityPolicyCount,
     ...tempHeaders,
   };
+  const cacheControlHeader = headers["cache-control"];
+  if (typeof cacheControlHeader === "string") {
+    headers["cache-control"] = cacheControlHeader.replace(/,\s+/g, ",");
+  }
+  const strictTransportHeader = headers["strict-transport-security"];
+  if (typeof strictTransportHeader === "string") {
+    headers["strict-transport-security"] = strictTransportHeader.replace(/;\s+/g, ";");
+  }
 
   const httpInfo = {
     headers,
@@ -877,13 +937,12 @@ async function buildVTMetadata(
   };
 
   // Redirect info (define early so contentInfo can use it)
-  // const redirectChain: string[] = Array.isArray(attr.redirection_chain)
-  //   ? attr.redirection_chain
-  //   : [];
-  const redirectChain: string[] = Array.isArray(attr.redirection_chain)
+  const redirectChainRaw = Array.isArray(attr.redirection_chain)
     ? attr.redirection_chain
+    : attr.redirection_chain == null
+    ? null
     : [];
-  const redirectCount = redirectChain.length;
+  const redirectChain: string[] = redirectChainRaw ?? [];
 
   // Favicon URL: VT sometimes stores a URL, otherwise try Link header, else heuristic /favicon.ico
   let favicon: string | undefined = attr.favicon ?? undefined;
@@ -907,18 +966,11 @@ async function buildVTMetadata(
   const urlEntropy = normalizedEntropy(url);
 
   // redirectEntropy: average of individual URL entropies across the chain
+  const redirectCount = redirectChainRaw === null ? null : redirectChain.length;
   const redirectEntropy =
-    redirectChain.length > 0
-      ? Number(
-          (
-            redirectChain.reduce(
-              (sum, u) => sum + normalizedEntropy(String(u)),
-              0
-            ) / redirectChain.length
-          ).toFixed(4)
-        )
-      : 0;
-  const redirectSimilarityValue = redirectSimilarity(redirectChain);
+    redirectChainRaw === null ? null : avgEntropy(redirectChain);
+  const redirectSimilarityValue =
+    redirectChainRaw === null ? null : avgSimilarity(redirectChain);
   const redirect = {
     count: redirectCount,
     entropy: redirectEntropy,
@@ -1084,26 +1136,52 @@ async function buildVTMetadata(
   const scValues: string[] | undefined = attr.categories
     ? Object.values(attr.categories).map((v: unknown) => String(v))
     : undefined;
-  const servicesKeyWords = top3Tokens(scValues, 3);
-  const suspiciousFeatures = attr.tags ?? undefined;
+  const servicesKeyWordsList = top3Tokens(scValues, 3);
+  const servicesKeyWords =
+    servicesKeyWordsList.length > 0
+      ? servicesKeyWordsList.join(",")
+      : undefined;
+  const suspiciousFeaturesList = Array.isArray(attr.tags)
+    ? attr.tags.map((t: any) => String(t)).filter(Boolean)
+    : attr.tags
+    ? [String(attr.tags)]
+    : [];
+  const suspiciousFeatures =
+    suspiciousFeaturesList.length > 0
+      ? suspiciousFeaturesList.join(",")
+      : undefined;
 
   // Normalize trackers: VT may return an array of objects, a single object, or nothing
-  let trackers: string[] = [];
+  let trackersList: string[] = [];
   if (Array.isArray(attr.trackers)) {
-    trackers = attr.trackers
+    trackersList = attr.trackers
       .flatMap((t: any) => (t && typeof t === "object" ? Object.keys(t) : []))
       .filter(Boolean);
   } else if (attr.trackers && typeof attr.trackers === "object") {
-    trackers = Object.keys(attr.trackers);
+    trackersList = Object.keys(attr.trackers);
   }
+  const trackers = trackersList.length > 0 ? trackersList.join(",") : undefined;
 
   // Normalize outgoing links to an array of strings
-  const embeddedUrls: string[] = Array.isArray(attr.outgoing_links)
-    ? (attr.outgoing_links as string[])
+  const outgoingLinksRaw = Array.isArray(attr.outgoing_links)
+    ? attr.outgoing_links
+    : attr.outgoing_links === null
+    ? null
     : [];
-  const embeddedUrlsCount = embeddedUrls.length;
-  const embeddedUrlsEntropy = averageStringEntropy(embeddedUrls);
-  const embeddedUrlsSimilarity = redirectSimilarity(embeddedUrls);
+
+  const embeddedUrls: string[] =
+    outgoingLinksRaw === undefined || null
+      ? []
+      : (outgoingLinksRaw as any[]).map((u) => String(u));
+
+  const embeddedUrlsCount =
+    outgoingLinksRaw === undefined || null ? null : embeddedUrls.length;
+
+  const embeddedUrlsEntropy =
+    outgoingLinksRaw === undefined || null ? null : avgEntropy(embeddedUrls);
+
+  const embeddedUrlsSimilarity =
+    outgoingLinksRaw === undefined || null ? null : avgSimilarity(embeddedUrls);
 
   // Build linked domains from multiple sources (relationships + outgoing_links + redirects)
   const linkedHostSet = new Set<string>();
@@ -1137,11 +1215,19 @@ async function buildVTMetadata(
   linkedHostSet.delete(hostname.toLowerCase());
 
   const linkedDomains = Array.from(linkedHostSet);
-  const linkedDomainsEntropy = averageStringEntropy(linkedDomains);
-  const linkedDomainsSimilarity = redirectSimilarity(linkedDomains);
+  const linkedDomainsCount =
+    attr.linked_domains === undefined || null ? null : linkedDomains.length;
+  const linkedDomainsEntropy =
+    attr.linked_domains === undefined || null
+      ? null
+      : avgEntropy(linkedDomains);
+  const linkedDomainsSimilarity =
+    attr.linked_domains === undefined || null
+      ? null
+      : avgSimilarity(linkedDomains);
 
   const externalResources = {
-    linkedDomainsCount: linkedDomains.length,
+    linkedDomainsCount,
     linkedDomainsEntropy,
     linkedDomainsSimilarity,
     embeddedUrlsCount,
@@ -1319,7 +1405,7 @@ async function buildVTMetadata(
       typeof v === "number" ? new Date(v * 1000).toISOString() : v;
 
     // SAN extraction: VT may provide as string or array under different keys
-    let sanEntries: string[] | undefined = undefined;
+    let sanEntries: string[] | null = null;
     const sanSrc =
       (certAttributes as any).extensions?.subject_alternative_name ??
       (certAttributes as any).subject_alternative_name ??
@@ -1333,19 +1419,27 @@ async function buildVTMetadata(
         .split(/,\s*/)
         .map((s: string) => s.replace(/^DNS:/i, "").trim())
         .filter(Boolean);
+    } else if (sanSrc === null) {
+      sanEntries = null;
     }
 
     const sanEntriesCount = Array.isArray(sanEntries)
       ? sanEntries.length
+      : sanEntries === null
+      ? null
       : undefined;
     const sanEntriesEntropy =
       Array.isArray(sanEntries) && sanEntries.length
-        ? averageStringEntropy(sanEntries)
+        ? avgEntropy(sanEntries)
+        : sanEntries === null
+        ? null
         : undefined;
     const sanEntriesSimilarity = Array.isArray(sanEntries)
       ? sanEntries.length > 1
-        ? redirectSimilarity(sanEntries)
+        ? avgSimilarity(sanEntries)
         : 1
+      : sanEntries === null
+      ? null
       : undefined;
 
     const fingerprint =
@@ -1388,7 +1482,6 @@ async function buildVTMetadata(
     urlEntropy,
     hostname,
     path,
-    // redirectChain,
     redirect,
     detectionVotes,
     domain: {
@@ -1457,11 +1550,12 @@ async function run() {
   const metadata: VTURLMetadata = await buildVTMetadata(target, urlReport);
 
   const output = deepMarkAbsent(metadata);
+  const flattenedOutput = flattenObject(output);
 
   // 4) Write JSON to output.json file
   fs.writeFileSync(
     "./outputs/output.json",
-    JSON.stringify(output, null, 2),
+    JSON.stringify(flattenedOutput, null, 2),
     "utf-8"
   );
   console.log("Output written to output.json");
