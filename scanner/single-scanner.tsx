@@ -9,15 +9,18 @@ function isForbidden(err: any): boolean {
   const msg = String(err?.message || err || "");
   return msg.includes("403") || msg.toLowerCase().includes("forbidden");
 }
-// Enhanced VirusTotal API Response Types with comprehensive metadata
+// VirusTotal API Response Types
 export interface VTURLMetadata {
-  // Basic URL info
-  scanId?: string;
-  reputation?: number;
+  // Basic info
   url: string;
   urlEntropy?: number;
   hostname: string;
-  path: string;
+
+  // Vote info
+  reputation?: number;
+  detectionVotes: DetectionStats;
+  servicesKeyWords?: string;
+  suspiciousFeatures?: string;
 
   // Redirection
   redirect?: {
@@ -26,7 +29,14 @@ export interface VTURLMetadata {
     similarity?: number | null;
   };
 
-  // Domain info
+  // DNS
+  dns?: {
+    count?: number;
+    firstSeen?: string;
+    lastSeen?: string;
+  };
+
+  // Domain
   domain: {
     registrar?: string;
     creationDate?: string;
@@ -34,43 +44,33 @@ export interface VTURLMetadata {
     domainAge?: number | string;
   };
 
-  // Network and hosting info
+  // Network
   network: {
     asn?: string;
     asOwner?: string;
     country?: string;
   };
 
-  // HTTP response info
+  // HTTP
   httpInfo: {
-    headers?: Record<string, string | number | null>;
     statusCode?: number;
     contentType?: string;
     contentLength?: number;
     serverInfo?: string;
-    hsts?: boolean;
+    headers?: Record<string, string | number | null>;
   };
 
-  // TLS/SSL Certificate info
+  // TLS, SSL, and Certificate
   tlsInfo?: {
+    fingerprint?: string;
     issuer: string;
     subject: string;
     validFrom: string;
     validTo: string;
     serialNumber: string;
-    fingerprint?: string;
     sanEntriesCount?: number | null;
     sanEntriesEntropy?: number | null;
     sanEntriesSimilarity?: number | null;
-  };
-
-  /** Certificate */
-  certificateInfo?: {
-    issuerCN?: string;
-    subjectCN?: string;
-    notBefore?: string;
-    notAfter?: string;
-    serialNumber?: string;
   };
 
   // Content Info
@@ -83,29 +83,13 @@ export interface VTURLMetadata {
     metaTagCount?: number;
   };
 
-  // Detection Vote
-  detectionVotes: DetectionStats;
-  servicesKeyWords?: string;
-  suspiciousFeatures?: string;
-
   // External Resources
   externalResources: {
-    linkedDomains?: string[];
-    linkedDomainsCount?: number | null;
-    linkedDomainsEntropy?: number | null;
-    linkedDomainsSimilarity?: number | null;
     embeddedUrls?: string[];
     embeddedUrlsCount?: number | null;
     embeddedUrlsEntropy?: number | null;
     embeddedUrlsSimilarity?: number | null;
     trackers?: string;
-  };
-
-  // Passive DNS and historical data
-  passiveDns?: {
-    totalResolutions?: number;
-    firstSeen?: string;
-    lastSeen?: string;
   };
 }
 
@@ -127,7 +111,6 @@ export interface VTDomainResponse {
     };
   };
 }
-
 export interface VTIPResponse {
   data: {
     id: string;
@@ -141,7 +124,7 @@ export interface VTIPResponse {
   };
 }
 
-// ===== scanner.tsx (kept in full) =====
+// ===== Helper Functions =====
 import fs from "fs";
 import { getDomain as tldGetDomain } from "tldts";
 
@@ -189,7 +172,7 @@ function flattenObject(
   return flat;
 }
 
-// Helper: Append a failed URL to a waitlist file (best-effort)
+// Append a failed URL to a waitlist file (best-effort)
 function appendToWaitlist(url: string, note?: string) {
   try {
     const line = `${new Date().toISOString()}\t${url}${
@@ -197,11 +180,11 @@ function appendToWaitlist(url: string, note?: string) {
     }\n`;
     fs.appendFileSync("./outputs/waitlist.txt", line, { encoding: "utf-8" });
   } catch (e) {
-    // best-effort; do not crash if we can't write the waitlist
+    console.log("Could not write to waitlist.txt");
   }
 }
 
-// ====== CONFIG ======
+// ====== API CONFIG ======
 const API_KEY =
   "1d0b32a0630fc45fc0f7ef17c35421d2f56d961f97fcca7a9a135b4235268bf9";
 const BASE = "https://www.virustotal.com/api/v3";
@@ -221,6 +204,7 @@ function encodeVTUrl(u: string): string {
     .replace(/=+$/, "");
 }
 
+// ====== API CALL ======
 async function vtGet(path: string) {
   const res = await fetch(`${BASE}${path}`, {
     headers: { "x-apikey": API_KEY },
@@ -816,10 +800,10 @@ async function fetchPassiveDnsForDomain(hostname: string) {
     }
 
     return {
-      totalResolutions: rows.length,
+      count: rows.length,
       firstSeen: toISODate(first),
       lastSeen: toISODate(last),
-    } as VTURLMetadata["passiveDns"];
+    } as VTURLMetadata["dns"];
   } catch (e) {
     dlog(
       "passive DNS (domain) fetch failed:",
@@ -846,10 +830,10 @@ async function fetchPassiveDnsForIP(ip: string) {
     }
 
     return {
-      totalResolutions: rows.length,
+      count: rows.length,
       firstSeen: toISODate(first),
       lastSeen: toISODate(last),
-    } as VTURLMetadata["passiveDns"];
+    } as VTURLMetadata["dns"];
   } catch (e) {
     dlog("passive DNS (ip) fetch failed:", (e as any)?.message || String(e));
     return undefined;
@@ -888,8 +872,6 @@ async function buildVTMetadata(
     "cache-control": getHeaderCI(rawHeaders, "cache-control"),
     "x-powered-by": getHeaderCI(rawHeaders, "x-powered-by"),
   };
-  // Determine HSTS from the optional value BEFORE mapping to ABSENT
-  const hsts = Boolean(selectedMaybe["strict-transport-security"]);
   // Build headers map allowing string | number | null (temporary)
   const tempHeaders: Record<string, string | number | null> =
     Object.fromEntries(
@@ -925,7 +907,10 @@ async function buildVTMetadata(
   }
   const strictTransportHeader = headers["strict-transport-security"];
   if (typeof strictTransportHeader === "string") {
-    headers["strict-transport-security"] = strictTransportHeader.replace(/;\s+/g, ";");
+    headers["strict-transport-security"] = strictTransportHeader.replace(
+      /;\s+/g,
+      ";"
+    );
   }
 
   const httpInfo = {
@@ -933,7 +918,6 @@ async function buildVTMetadata(
     statusCode: attr.last_http_response_code ?? undefined,
     contentLength: attr.last_http_response_content_length ?? undefined,
     serverInfo: (headers["server"] as string | null) || undefined,
-    hsts,
   };
 
   // Redirect info (define early so contentInfo can use it)
@@ -1183,53 +1167,7 @@ async function buildVTMetadata(
   const embeddedUrlsSimilarity =
     outgoingLinksRaw === undefined || null ? null : avgSimilarity(embeddedUrls);
 
-  // Build linked domains from multiple sources (relationships + outgoing_links + redirects)
-  const linkedHostSet = new Set<string>();
-
-  // a) Contacted domains via URL relationships (best signal)
-  try {
-    const urlId = encodeVTUrl(targetUrl);
-    const relDomains = await fetchContactedDomainsFromUrl(urlId);
-    for (const d of relDomains) {
-      if (d && typeof d === "string") linkedHostSet.add(d.toLowerCase());
-    }
-  } catch {}
-
-  // b) Hosts from outgoing_links
-  for (const u of embeddedUrls) {
-    try {
-      const h = new URL(u).hostname.toLowerCase();
-      if (h) linkedHostSet.add(h);
-    } catch {}
-  }
-
-  // c) Hosts from redirect chain
-  for (const u of redirectChain) {
-    try {
-      const h = new URL(u).hostname.toLowerCase();
-      if (h) linkedHostSet.add(h);
-    } catch {}
-  }
-
-  // Remove the page's own hostname from linked domains
-  linkedHostSet.delete(hostname.toLowerCase());
-
-  const linkedDomains = Array.from(linkedHostSet);
-  const linkedDomainsCount =
-    attr.linked_domains === undefined || null ? null : linkedDomains.length;
-  const linkedDomainsEntropy =
-    attr.linked_domains === undefined || null
-      ? null
-      : avgEntropy(linkedDomains);
-  const linkedDomainsSimilarity =
-    attr.linked_domains === undefined || null
-      ? null
-      : avgSimilarity(linkedDomains);
-
   const externalResources = {
-    linkedDomainsCount,
-    linkedDomainsEntropy,
-    linkedDomainsSimilarity,
     embeddedUrlsCount,
     embeddedUrlsEntropy,
     embeddedUrlsSimilarity,
@@ -1248,24 +1186,24 @@ async function buildVTMetadata(
   const distinctRedirectHosts = new Set(redirectHosts).size;
 
   // Passive DNS
-  let passiveDns: VTURLMetadata["passiveDns"] | undefined = undefined;
+  let dns: VTURLMetadata["dns"] | undefined = undefined;
   try {
     const pdDomain = await fetchPassiveDnsForDomain(hostname);
     if (
       pdDomain &&
-      (pdDomain.firstSeen || pdDomain.lastSeen || pdDomain.totalResolutions)
+      (pdDomain.firstSeen || pdDomain.lastSeen || pdDomain.count)
     ) {
-      passiveDns = pdDomain;
+      dns = pdDomain;
     }
   } catch {}
 
   // Optionally complement with IP-side resolutions if we have the serving IP
   try {
     const ipForDns = attr.last_serving_ip_address;
-    if (!passiveDns && ipForDns) {
+    if (!dns && ipForDns) {
       const pdIp = await fetchPassiveDnsForIP(ipForDns);
-      if (pdIp && (pdIp.firstSeen || pdIp.lastSeen || pdIp.totalResolutions)) {
-        passiveDns = pdIp;
+      if (pdIp && (pdIp.firstSeen || pdIp.lastSeen || pdIp.count)) {
+        dns = pdIp;
       }
     }
   } catch {}
@@ -1325,44 +1263,6 @@ async function buildVTMetadata(
       }
     }
   } catch {}
-
-  // Normalize to certificateInfo shape (after all attempts)
-  let certificateInfo: VTURLMetadata["certificateInfo"] = undefined;
-  if (certAttributes) {
-    const issuerCN =
-      parseCNFromDN(certAttributes.issuer) ||
-      parseCNFromDN(certAttributes.issuer_dn) ||
-      (certAttributes as any).issuer_cn;
-    const subjectCN =
-      parseCNFromDN(certAttributes.subject) ||
-      parseCNFromDN(certAttributes.subject_dn) ||
-      (certAttributes as any).subject_cn;
-
-    const nbRaw =
-      certAttributes.validity?.not_before ??
-      (certAttributes as any).not_before ??
-      (certAttributes as any).validity_not_before;
-    const naRaw =
-      certAttributes.validity?.not_after ??
-      (certAttributes as any).not_after ??
-      (certAttributes as any).validity_not_after;
-
-    const toIso = (v: any) =>
-      typeof v === "number" ? new Date(v * 1000).toISOString() : v;
-
-    certificateInfo = {
-      issuerCN: issuerCN,
-      subjectCN: subjectCN,
-      notBefore: toIso(nbRaw),
-      notAfter: toIso(naRaw),
-      serialNumber:
-        (certAttributes as any).serial_number ||
-        (certAttributes as any).serialNumber ||
-        (certAttributes as any).serial ||
-        undefined,
-    };
-    dlog("certificateInfo:", certificateInfo);
-  }
 
   // Build tlsInfo (full certificate view) from certAttributes if available
   let tlsInfo: VTURLMetadata["tlsInfo"] | undefined = undefined;
@@ -1476,12 +1376,10 @@ async function buildVTMetadata(
   }
 
   const metadata: VTURLMetadata = {
-    scanId: vtUrlPayload?.data?.id,
     reputation: attr.reputation ?? undefined,
     url,
     urlEntropy,
     hostname,
-    path,
     redirect,
     detectionVotes,
     domain: {
@@ -1493,12 +1391,11 @@ async function buildVTMetadata(
     network,
     httpInfo,
     tlsInfo,
-    certificateInfo,
     contentInfo,
     servicesKeyWords,
     suspiciousFeatures,
     externalResources,
-    passiveDns,
+    dns,
   };
 
   return metadata;
@@ -1548,9 +1445,120 @@ async function run() {
 
   // 2) Extract a concise, useful summary from VT payload
   const metadata: VTURLMetadata = await buildVTMetadata(target, urlReport);
-
   const output = deepMarkAbsent(metadata);
   const flattenedOutput = flattenObject(output);
+  const renameMap: Record<string, string> = {
+    detectionVotesMalicious: "maliciousVotes",
+    detectionVotesSuspicious: "suspiciousVotes",
+    detectionVotesHarmless: "harmlessVotes",
+    detectionVotesUndetected: "undetectedVotes",
+    "httpInfoHeadersContent-security-policy-count":
+      "contentSecurityPolicyCount",
+    "httpInfoHeadersStrict-transport-security": "strictTransportSecurity",
+    "httpInfoHeadersX-frame-options": "xFrameOptions",
+    "httpInfoHeadersX-content-type-options": "xContentTypeOptions",
+    "httpInfoHeadersReferrer-policy": "referrerPolicy",
+    httpInfoHeadersServer: "hostingServer",
+    "httpInfoHeadersCache-control": "cacheControlPolicy",
+    "httpInfoHeadersX-powered-by": "xPoweredBy",
+    httpInfoStatusCode: "statusCode",
+    httpInfoContentLength: "contentSize",
+    httpInfoServerInfo: "serverInfo",
+    tlsInfoIssuer: "tlsIssuer",
+    tlsInfoSubject: "tlsSubject",
+    tlsInfoValidFrom: "tlsValidFrom",
+    tlsInfoValidTo: "tlsValidTo",
+    tlsInfoSerialNumber: "tlsSerialNumber",
+    tlsInfoFingerprint: "tlsFingerprint",
+    tlsInfoSanEntriesCount: "sanEntriesCount",
+    tlsInfoSanEntriesEntropy: "sanEntriesEntropy",
+    tlsInfoSanEntriesSimilarity: "sanEntriesSimilarity",
+    externalResourcesEmbeddedUrlsCount: "embeddedUrlsCount",
+    externalResourcesEmbeddedUrlsEntropy: "embeddedUrlsEntropy",
+    externalResourcesEmbeddedUrlsSimilarity: "embeddedUrlsSimilarity",
+  };
+  for (const [oldKey, newKey] of Object.entries(renameMap)) {
+    if (Object.prototype.hasOwnProperty.call(flattenedOutput, oldKey)) {
+      flattenedOutput[newKey] = flattenedOutput[oldKey];
+      delete flattenedOutput[oldKey];
+    }
+  }
+  const orderedOutput: Record<string, any> = {};
+  const remaining = new Map(Object.entries(flattenedOutput));
+
+  const consumeKey = (key: string) => {
+    if (remaining.has(key)) {
+      orderedOutput[key] = remaining.get(key);
+      remaining.delete(key);
+    }
+  };
+
+  const consumeKeys = (keys: string[]) => {
+    for (const key of keys) consumeKey(key);
+  };
+
+  const consumePrefix = (prefix: string) => {
+    const keys = Array.from(remaining.keys())
+      .filter((k) => k.startsWith(prefix))
+      .sort();
+    for (const key of keys) consumeKey(key);
+  };
+
+  consumeKeys(["scanId", "url", "urlEntropy", "hostname", "path"]);
+
+  consumeKeys([
+    "reputation",
+    "maliciousVotes",
+    "suspiciousVotes",
+    "harmlessVotes",
+    "undetectedVotes",
+    "servicesKeyWords",
+    "suspiciousFeatures",
+  ]);
+
+  consumePrefix("redirect");
+  consumeKeys(["dnsCount", "dnsFirstSeen", "dnsLastSeen"]);
+  consumePrefix("domain");
+  consumePrefix("network");
+
+  consumeKeys([
+    "statusCode",
+    "contentSize",
+    "serverInfo",
+    "hstsEnable",
+    "hostingServer",
+    "referrerPolicy",
+    "contentSecurityPolicyCount",
+    "strictTransportSecurity",
+    "cacheControlPolicy",
+    "xFrameOptions",
+    "xContentTypeOptions",
+    "xPoweredBy",
+  ]);
+
+  consumePrefix("tls");
+  consumePrefix("san");
+  consumePrefix("certificateInfo");
+  consumePrefix("contentInfo");
+
+  consumePrefix("linkedDomains");
+  consumePrefix("embeddedUrls");
+  consumePrefix("externalResources");
+  consumePrefix("trackers");
+  consumePrefix("passiveDns");
+
+  // Append any remaining keys in alphabetical order
+  for (const [key, value] of Array.from(remaining.entries()).sort((a, b) =>
+    a[0].localeCompare(b[0])
+  )) {
+    orderedOutput[key] = value;
+    remaining.delete(key);
+  }
+
+  for (const key of Object.keys(flattenedOutput)) {
+    delete (flattenedOutput as any)[key];
+  }
+  Object.assign(flattenedOutput, orderedOutput);
 
   // 4) Write JSON to output.json file
   fs.writeFileSync(
