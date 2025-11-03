@@ -126,8 +126,25 @@ export interface VTIPResponse {
 
 // ===== Helper Functions =====
 import fs from "fs";
+import path from "path";
 import { pathToFileURL } from "url";
 import { getDomain as tldGetDomain } from "tldts";
+
+export interface ScanContext {
+  order?: string;
+  label?: string;
+  rawUrl?: string;
+}
+
+export type ScanResult =
+  | { status: "success"; data: Record<string, any> }
+  | { status: "waitlist"; note?: string }
+  | { status: "error"; error: string };
+
+export const WAITLIST_CSV_PATH = "./outputs/waitlist.csv";
+const WAITLIST_HEADERS = ["order", "url", "label", "note"];
+export const ERROR_CSV_PATH = "./outputs/error.csv";
+const ERROR_HEADERS = ["order", "url", "label", "error"];
 
 const ABSENT = null;
 
@@ -173,16 +190,66 @@ function flattenObject(
   return flat;
 }
 
-// Append a failed URL to a waitlist file (best-effort)
-function appendToWaitlist(url: string, note?: string) {
-  try {
-    const line = `${new Date().toISOString()}\t${url}${
-      note ? `\t${note}` : ""
-    }\n`;
-    fs.appendFileSync("./outputs/waitlist.txt", line, { encoding: "utf-8" });
-  } catch (e) {
-    console.log("Could not write to waitlist.txt");
+function csvEscape(value: string | undefined): string {
+  if (value === undefined || value === null) return "";
+  const str = String(value);
+  if (/[",\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
   }
+  return str;
+}
+
+function appendCsvRow(
+  filePath: string,
+  headers: string[],
+  values: Array<string | undefined>
+) {
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(
+        filePath,
+        `${headers.map(csvEscape).join(",")}\n`,
+        "utf-8"
+      );
+    }
+    fs.appendFileSync(
+      filePath,
+      `${values.map(csvEscape).join(",")}\n`,
+      "utf-8"
+    );
+  } catch (e) {
+    console.log(
+      `Could not write to ${filePath}:`,
+      (e as any)?.message || e
+    );
+  }
+}
+
+function appendToWaitlist(
+  url: string,
+  note: string | undefined,
+  context?: ScanContext
+) {
+  appendCsvRow(WAITLIST_CSV_PATH, WAITLIST_HEADERS, [
+    context?.order ?? "",
+    context?.rawUrl ?? url,
+    context?.label ?? "",
+    note ?? "",
+  ]);
+}
+
+function appendToErrorLog(
+  url: string,
+  error: string,
+  context?: ScanContext
+) {
+  appendCsvRow(ERROR_CSV_PATH, ERROR_HEADERS, [
+    context?.order ?? "",
+    context?.rawUrl ?? url,
+    context?.label ?? "",
+    error,
+  ]);
 }
 
 // ====== API CONFIG ======
@@ -1517,8 +1584,9 @@ function finalizeOutput(metadata: VTURLMetadata): Record<string, any> {
 }
 
 export async function scanUrl(
-  target: string
-): Promise<Record<string, any> | null> {
+  target: string,
+  context: ScanContext = {}
+): Promise<ScanResult> {
   const ensureScheme = (url: string, scheme: "https" | "http"): string => {
     if (!url) return url;
     if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) return url;
@@ -1528,76 +1596,98 @@ export async function scanUrl(
   const normalizedHttps = ensureScheme(target, "https");
   console.log(`VirusTotal URL scan for: ${normalizedHttps}`);
 
-  let urlReport: any | null = null;
   try {
-    urlReport = await getUrlReport(normalizedHttps);
-  } catch (e: any) {
-    console.log(
-      "No existing VirusTotal report — submitting to VT and waitlisting."
-    );
+    let urlReport: any | null = null;
     try {
-      await submitUrl(normalizedHttps);
-    } catch (_) {
-      // ignore submission failures; still waitlist the URL
-    }
-    try {
-      fs.appendFileSync("./outputs/waitlist.txt", `${normalizedHttps}\n`, {
-        encoding: "utf-8",
-      });
-    } catch (_) {
-      // best-effort; don't crash if write fails
-    }
-    return null;
-  }
-
-  const _attr = urlReport?.data?.attributes ?? {};
-  if (!_attr || !_attr.last_analysis_stats) {
-    console.log(
-      "VirusTotal record exists but analysis not complete — adding to waitlist."
-    );
-    appendToWaitlist(normalizedHttps, "analysis not complete");
-    return null;
-  }
-
-  let metadata: VTURLMetadata = await buildVTMetadata(
-    normalizedHttps,
-    urlReport
-  );
-  let flattened = finalizeOutput(metadata);
-
-  if (
-    flattened.statusCode === null ||
-    flattened.statusCode === undefined
-  ) {
-    console.log(
-      "statusCode missing; retrying with http:// prefix fallback."
-    );
-    const normalizedHttp = ensureScheme(target, "http");
-    try {
-      const reportHttp = await getUrlReport(normalizedHttp);
-      const attrHttp = reportHttp?.data?.attributes ?? {};
-      if (attrHttp && attrHttp.last_analysis_stats) {
-        metadata = await buildVTMetadata(normalizedHttp, reportHttp);
-        flattened = finalizeOutput(metadata);
-      } else {
-        console.log("HTTP fallback also lacks analysis stats; keeping original.");
+      urlReport = await getUrlReport(normalizedHttps);
+    } catch (e: any) {
+      const message = e?.message || String(e);
+      const isNotFound = message.includes("404");
+      if (isNotFound) {
+        console.log(
+          "No existing VirusTotal report — submitting to VT and waitlisting."
+        );
+        try {
+          await submitUrl(normalizedHttps);
+        } catch (_) {
+          // ignore submission failures; still waitlist the URL
+        }
+        const waitlistUrl = context?.rawUrl ?? target;
+        appendToWaitlist(waitlistUrl, "no VT report", context);
+        return { status: "waitlist", note: "no VT report" };
       }
-    } catch (err: any) {
-      console.log(
-        "HTTP fallback failed:",
-        err?.message || String(err)
-      );
+      const errorUrl = context?.rawUrl ?? target;
+      appendToErrorLog(errorUrl, message, context);
+      return { status: "error", error: message };
     }
-  }
 
-  return flattened;
+    const _attr = urlReport?.data?.attributes ?? {};
+    if (!_attr || !_attr.last_analysis_stats) {
+      console.log(
+        "VirusTotal record exists but analysis not complete — adding to waitlist."
+      );
+      const waitlistUrl = context?.rawUrl ?? target;
+      appendToWaitlist(waitlistUrl, "analysis not complete", context);
+      return { status: "waitlist", note: "analysis not complete" };
+    }
+
+    let metadata: VTURLMetadata = await buildVTMetadata(
+      normalizedHttps,
+      urlReport
+    );
+    let flattened = finalizeOutput(metadata);
+
+    if (
+      flattened.statusCode === null ||
+      flattened.statusCode === undefined
+    ) {
+      console.log(
+        "statusCode missing; retrying with http:// prefix fallback."
+      );
+      const normalizedHttp = ensureScheme(target, "http");
+      try {
+        const reportHttp = await getUrlReport(normalizedHttp);
+        const attrHttp = reportHttp?.data?.attributes ?? {};
+        if (attrHttp && attrHttp.last_analysis_stats) {
+          metadata = await buildVTMetadata(normalizedHttp, reportHttp);
+          flattened = finalizeOutput(metadata);
+        } else {
+          console.log(
+            "HTTP fallback also lacks analysis stats; keeping HTTPS result."
+          );
+        }
+      } catch (err: any) {
+        console.log(
+          "HTTP fallback failed:",
+          err?.message || String(err)
+        );
+      }
+    }
+
+    return { status: "success", data: flattened };
+  } catch (err: any) {
+    const message = err?.message || String(err);
+    const errorUrl = context?.rawUrl ?? target;
+    appendToErrorLog(errorUrl, message, context);
+    return { status: "error", error: message };
+  }
 }
 
 async function run() {
   const cliArg = process.argv[2];
   const target = cliArg || HARDCODED_URL;
-  const flattenedOutput = await scanUrl(target);
-  if (!flattenedOutput) return;
+  const result = await scanUrl(target, { rawUrl: target });
+  if (result.status === "waitlist") {
+    console.log("URL added to waitlist; no output generated yet.");
+    return;
+  }
+  if (result.status === "error") {
+    console.error("Scan failed:", result.error);
+    process.exitCode = 1;
+    return;
+  }
+
+  const flattenedOutput = result.data;
 
   fs.writeFileSync(
     "./outputs/output.json",

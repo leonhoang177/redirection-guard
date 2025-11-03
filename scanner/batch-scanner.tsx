@@ -1,6 +1,11 @@
 import fs from "fs";
 import { pathToFileURL } from "url";
-import { scanUrl } from "./single-scanner";
+import {
+  scanUrl,
+  ScanResult,
+  WAITLIST_CSV_PATH,
+  ERROR_CSV_PATH,
+} from "./single-scanner";
 
 const INPUT_PATH = "./inputs/mixed_urls_10.csv";
 const OUTPUT_PATH = "./outputs/output.jsonl";
@@ -58,7 +63,7 @@ async function runBatch() {
     .filter((line) => line.length > 0);
 
   if (lines.length <= 1) {
-    console.log("No data rows found in file.csv. Nothing to do.");
+    console.log("No data rows found in CSV. Nothing to do.");
     return;
   }
 
@@ -67,13 +72,27 @@ async function runBatch() {
     (h) => h.toLowerCase() === "url" || h.toLowerCase() === "link"
   );
   const labelIndex = header.findIndex((h) => h.toLowerCase() === "label");
+  const orderIndex = header.findIndex((h) => h.toLowerCase() === "order");
   if (urlIndex === -1 || labelIndex === -1) {
     console.error("Input CSV must contain 'Url' and 'Label' columns.");
     process.exitCode = 1;
     return;
   }
 
+  fs.mkdirSync("./outputs", { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, "", "utf-8");
+  for (const logPath of [WAITLIST_CSV_PATH, ERROR_CSV_PATH]) {
+    try {
+      if (fs.existsSync(logPath)) {
+        fs.unlinkSync(logPath);
+      }
+    } catch (err: any) {
+      console.error(
+        `Failed to reset ${logPath}:`,
+        err?.message || String(err)
+      );
+    }
+  }
 
   for (let i = 1; i < lines.length; i++) {
     const rawLine = lines[i];
@@ -81,20 +100,30 @@ async function runBatch() {
     const fields = parseDelimitedLine(rawLine);
     const url = fields[urlIndex];
     const label = fields[labelIndex];
-    if (!url) continue;
+    const order = orderIndex !== -1 ? fields[orderIndex] : String(i);
+    if (!url) {
+      console.error(`Skipping row ${i}: missing URL.`);
+      continue;
+    }
 
     console.log(`\n=== Processing ${url} ===`);
     try {
-      const result = await scanUrl(url);
-      if (result) {
+      const result: ScanResult = await scanUrl(url, {
+        order,
+        label,
+        rawUrl: url,
+      });
+      if (result.status === "success") {
         const record = {
-          input_text: formatInputText(result),
+          input_text: formatInputText(result.data),
           output_text: label ?? "",
         };
         fs.appendFileSync(OUTPUT_PATH, `${JSON.stringify(record)}\n`, "utf-8");
         console.log(`Saved result for ${url}`);
-      } else {
+      } else if (result.status === "waitlist") {
         console.log(`No result generated for ${url} (likely waitlisted).`);
+      } else {
+        console.error(`Error scanning ${url}: ${result.error}`);
       }
     } catch (err: any) {
       console.error(`Error scanning ${url}:`, err?.message || String(err));
