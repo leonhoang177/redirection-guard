@@ -1519,22 +1519,29 @@ function finalizeOutput(metadata: VTURLMetadata): Record<string, any> {
 export async function scanUrl(
   target: string
 ): Promise<Record<string, any> | null> {
-  console.log(`VirusTotal URL scan for: ${target}`);
+  const ensureScheme = (url: string, scheme: "https" | "http"): string => {
+    if (!url) return url;
+    if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) return url;
+    return `${scheme}://${url}`;
+  };
+
+  const normalizedHttps = ensureScheme(target, "https");
+  console.log(`VirusTotal URL scan for: ${normalizedHttps}`);
 
   let urlReport: any | null = null;
   try {
-    urlReport = await getUrlReport(target);
+    urlReport = await getUrlReport(normalizedHttps);
   } catch (e: any) {
     console.log(
       "No existing VirusTotal report — submitting to VT and waitlisting."
     );
     try {
-      await submitUrl(target);
+      await submitUrl(normalizedHttps);
     } catch (_) {
       // ignore submission failures; still waitlist the URL
     }
     try {
-      fs.appendFileSync("./outputs/waitlist.txt", `${target}\n`, {
+      fs.appendFileSync("./outputs/waitlist.txt", `${normalizedHttps}\n`, {
         encoding: "utf-8",
       });
     } catch (_) {
@@ -1548,12 +1555,42 @@ export async function scanUrl(
     console.log(
       "VirusTotal record exists but analysis not complete — adding to waitlist."
     );
-    appendToWaitlist(target, "analysis not complete");
+    appendToWaitlist(normalizedHttps, "analysis not complete");
     return null;
   }
 
-  const metadata: VTURLMetadata = await buildVTMetadata(target, urlReport);
-  return finalizeOutput(metadata);
+  let metadata: VTURLMetadata = await buildVTMetadata(
+    normalizedHttps,
+    urlReport
+  );
+  let flattened = finalizeOutput(metadata);
+
+  if (
+    flattened.statusCode === null ||
+    flattened.statusCode === undefined
+  ) {
+    console.log(
+      "statusCode missing; retrying with http:// prefix fallback."
+    );
+    const normalizedHttp = ensureScheme(target, "http");
+    try {
+      const reportHttp = await getUrlReport(normalizedHttp);
+      const attrHttp = reportHttp?.data?.attributes ?? {};
+      if (attrHttp && attrHttp.last_analysis_stats) {
+        metadata = await buildVTMetadata(normalizedHttp, reportHttp);
+        flattened = finalizeOutput(metadata);
+      } else {
+        console.log("HTTP fallback also lacks analysis stats; keeping original.");
+      }
+    } catch (err: any) {
+      console.log(
+        "HTTP fallback failed:",
+        err?.message || String(err)
+      );
+    }
+  }
+
+  return flattened;
 }
 
 async function run() {
