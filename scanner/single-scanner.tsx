@@ -41,7 +41,7 @@ export interface VTURLMetadata {
     registrar?: string;
     creationDate?: string;
     expirationDate?: string;
-    domainAge?: number | string;
+    age?: number | string;
   };
 
   // Network
@@ -62,12 +62,12 @@ export interface VTURLMetadata {
 
   // TLS, SSL, and Certificate
   tlsInfo?: {
-    fingerprint?: string;
     issuer: string;
     subject: string;
     validFrom: string;
     validTo: string;
     serialNumber: string;
+    fingerprint?: string;
     sanEntriesCount?: number | null;
     sanEntriesEntropy?: number | null;
     sanEntriesSimilarity?: number | null;
@@ -126,6 +126,7 @@ export interface VTIPResponse {
 
 // ===== Helper Functions =====
 import fs from "fs";
+import { pathToFileURL } from "url";
 import { getDomain as tldGetDomain } from "tldts";
 
 const ABSENT = null;
@@ -259,10 +260,10 @@ async function fetchDomainInfo(hostname: string) {
     const registrar = attr.registrar;
     const creationDate = formatUtcDateTime(attr.creation_date);
     const expirationDate = formatUtcDateTime(attr.expiration_date);
-    let domainAge: number | undefined = undefined;
+    let age: number | undefined = undefined;
     if (attr.creation_date) {
       const now = Date.now();
-      domainAge = Math.floor(
+      age = Math.floor(
         (now - attr.creation_date * 1000) / (1000 * 60 * 60 * 24)
       );
     }
@@ -279,7 +280,7 @@ async function fetchDomainInfo(hostname: string) {
       registrar,
       creationDate,
       expirationDate,
-      domainAge,
+      age,
       _lastHttpsCert: lastHttpsCert,
       _firstA: firstA,
     } as any;
@@ -289,7 +290,7 @@ async function fetchDomainInfo(hostname: string) {
       registrar: ABSENT,
       creationDate: ABSENT,
       expirationDate: ABSENT,
-      domainAge: ABSENT,
+      age: ABSENT,
       _lastHttpsCert: undefined,
       _firstA: undefined,
     } as any;
@@ -777,12 +778,8 @@ function formatUtcDateTime(value: any): string | undefined {
     date = new Date(parsed);
   }
   if (Number.isNaN(date.getTime())) return undefined;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(
-    date.getUTCDate()
-  )} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(
-    date.getUTCSeconds()
-  )}`;
+  const iso = date.toISOString();
+  return iso.replace(/\.\d{3}Z$/, "Z");
 }
 
 async function fetchPassiveDnsForDomain(hostname: string) {
@@ -1387,7 +1384,7 @@ async function buildVTMetadata(
       registrar: domain.registrar,
       creationDate: domain.creationDate,
       expirationDate: domain.expirationDate,
-      domainAge: domain.domainAge,
+      age: domain.age,
     },
     network,
     httpInfo,
@@ -1402,50 +1399,7 @@ async function buildVTMetadata(
   return metadata;
 }
 
-async function run() {
-  const cliArg = process.argv[2]; // optional CLI arg
-  const target = cliArg || HARDCODED_URL;
-
-  console.log(`VirusTotal URL scan for: ${target}`);
-
-  let urlReport: any | null = null;
-
-  // 1) Try to fetch an existing report (no retries, no submit)
-  try {
-    urlReport = await getUrlReport(target);
-  } catch (e: any) {
-    console.log(
-      "No existing VirusTotal report — submitting to VT and waitlisting."
-    );
-    try {
-      // Submit to VT so analysis can start, but do not poll.
-      await submitUrl(target);
-    } catch (_) {
-      // ignore submission failures; still waitlist the URL
-    }
-    try {
-      // Write ONLY the raw URL, one per line
-      fs.appendFileSync("./outputs/waitlist.txt", `${target}\n`, {
-        encoding: "utf-8",
-      });
-    } catch (_) {
-      // best-effort; don't crash if write fails
-    }
-    return; // stop; no output.json
-  }
-
-  // If VT record exists but lacks analysis stats, also waitlist and exit
-  const _attr = urlReport?.data?.attributes ?? {};
-  if (!_attr || !_attr.last_analysis_stats) {
-    console.log(
-      "VirusTotal record exists but analysis not complete — adding to waitlist and exiting."
-    );
-    appendToWaitlist(target, "analysis not complete");
-    return; // do nothing else
-  }
-
-  // 2) Extract a concise, useful summary from VT payload
-  const metadata: VTURLMetadata = await buildVTMetadata(target, urlReport);
+function finalizeOutput(metadata: VTURLMetadata): Record<string, any> {
   const output = deepMarkAbsent(metadata);
   const flattenedOutput = flattenObject(output);
   const renameMap: Record<string, string> = {
@@ -1465,6 +1419,7 @@ async function run() {
     httpInfoStatusCode: "statusCode",
     httpInfoContentLength: "contentSize",
     httpInfoServerInfo: "serverInfo",
+    httpInfoHsts: "hstsEnable",
     tlsInfoIssuer: "tlsIssuer",
     tlsInfoSubject: "tlsSubject",
     tlsInfoValidFrom: "tlsValidFrom",
@@ -1477,6 +1432,7 @@ async function run() {
     externalResourcesEmbeddedUrlsCount: "embeddedUrlsCount",
     externalResourcesEmbeddedUrlsEntropy: "embeddedUrlsEntropy",
     externalResourcesEmbeddedUrlsSimilarity: "embeddedUrlsSimilarity",
+    externalResourcesTrackers: "trackers",
   };
   for (const [oldKey, newKey] of Object.entries(renameMap)) {
     if (Object.prototype.hasOwnProperty.call(flattenedOutput, oldKey)) {
@@ -1484,6 +1440,7 @@ async function run() {
       delete flattenedOutput[oldKey];
     }
   }
+
   const orderedOutput: Record<string, any> = {};
   const remaining = new Map(Object.entries(flattenedOutput));
 
@@ -1537,31 +1494,74 @@ async function run() {
     "xPoweredBy",
   ]);
 
+  consumeKeys(["tlsIssuer", "tlsSubject", "tlsValidFrom", "tlsValidTo"]);
+  consumeKeys(["tlsSerialNumber", "tlsFingerprint"]);
+
   consumePrefix("tls");
   consumePrefix("san");
   consumePrefix("certificateInfo");
   consumePrefix("contentInfo");
 
-  consumePrefix("linkedDomains");
   consumePrefix("embeddedUrls");
   consumePrefix("externalResources");
   consumePrefix("trackers");
   consumePrefix("passiveDns");
 
-  // Append any remaining keys in alphabetical order
   for (const [key, value] of Array.from(remaining.entries()).sort((a, b) =>
     a[0].localeCompare(b[0])
   )) {
     orderedOutput[key] = value;
-    remaining.delete(key);
   }
 
-  for (const key of Object.keys(flattenedOutput)) {
-    delete (flattenedOutput as any)[key];
-  }
-  Object.assign(flattenedOutput, orderedOutput);
+  return orderedOutput;
+}
 
-  // 4) Write JSON to output.json file
+export async function scanUrl(
+  target: string
+): Promise<Record<string, any> | null> {
+  console.log(`VirusTotal URL scan for: ${target}`);
+
+  let urlReport: any | null = null;
+  try {
+    urlReport = await getUrlReport(target);
+  } catch (e: any) {
+    console.log(
+      "No existing VirusTotal report — submitting to VT and waitlisting."
+    );
+    try {
+      await submitUrl(target);
+    } catch (_) {
+      // ignore submission failures; still waitlist the URL
+    }
+    try {
+      fs.appendFileSync("./outputs/waitlist.txt", `${target}\n`, {
+        encoding: "utf-8",
+      });
+    } catch (_) {
+      // best-effort; don't crash if write fails
+    }
+    return null;
+  }
+
+  const _attr = urlReport?.data?.attributes ?? {};
+  if (!_attr || !_attr.last_analysis_stats) {
+    console.log(
+      "VirusTotal record exists but analysis not complete — adding to waitlist."
+    );
+    appendToWaitlist(target, "analysis not complete");
+    return null;
+  }
+
+  const metadata: VTURLMetadata = await buildVTMetadata(target, urlReport);
+  return finalizeOutput(metadata);
+}
+
+async function run() {
+  const cliArg = process.argv[2];
+  const target = cliArg || HARDCODED_URL;
+  const flattenedOutput = await scanUrl(target);
+  if (!flattenedOutput) return;
+
   fs.writeFileSync(
     "./outputs/output.json",
     JSON.stringify(flattenedOutput, null, 2),
@@ -1570,7 +1570,12 @@ async function run() {
   console.log("Output written to output.json");
 }
 
-run().catch((err) => {
-  console.error("Error:", err?.message || err);
-  process.exit(1);
-});
+const isMainModule =
+  process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+
+if (isMainModule) {
+  run().catch((err) => {
+    console.error("Error:", err?.message || err);
+    process.exit(1);
+  });
+}
