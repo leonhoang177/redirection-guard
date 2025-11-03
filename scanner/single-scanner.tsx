@@ -257,12 +257,8 @@ async function fetchDomainInfo(hostname: string) {
     const domainResp: VTDomainResponse = await vtGet(`/domains/${base}`);
     const attr = domainResp?.data?.attributes ?? {};
     const registrar = attr.registrar;
-    const creationDate = attr.creation_date
-      ? new Date(attr.creation_date * 1000).toISOString()
-      : undefined;
-    const expirationDate = attr.expiration_date
-      ? new Date(attr.expiration_date * 1000).toISOString()
-      : undefined;
+    const creationDate = formatUtcDateTime(attr.creation_date);
+    const expirationDate = formatUtcDateTime(attr.expiration_date);
     let domainAge: number | undefined = undefined;
     if (attr.creation_date) {
       const now = Date.now();
@@ -767,19 +763,26 @@ function getRegistrableDomain(hostname: string): string {
 }
 
 // ---- Passive DNS helpers ----
-function toISODate(value: any): string | undefined {
+function formatUtcDateTime(value: any): string | undefined {
   if (value === null || value === undefined) return undefined;
+  let date: Date;
   if (typeof value === "number") {
-    // VT usually returns seconds for these endpoints
     const ms = value > 1e12 ? value : value * 1000;
-    const d = new Date(ms);
-    return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+    date = new Date(ms);
+  } else if (value instanceof Date) {
+    date = value;
+  } else {
+    const parsed = Date.parse(String(value));
+    if (Number.isNaN(parsed)) return undefined;
+    date = new Date(parsed);
   }
-  if (typeof value === "string") {
-    const t = Date.parse(value);
-    if (!Number.isNaN(t)) return new Date(t).toISOString();
-  }
-  return undefined;
+  if (Number.isNaN(date.getTime())) return undefined;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(
+    date.getUTCDate()
+  )} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(
+    date.getUTCSeconds()
+  )}`;
 }
 
 async function fetchPassiveDnsForDomain(hostname: string) {
@@ -801,8 +804,8 @@ async function fetchPassiveDnsForDomain(hostname: string) {
 
     return {
       count: rows.length,
-      firstSeen: toISODate(first),
-      lastSeen: toISODate(last),
+      firstSeen: formatUtcDateTime(first),
+      lastSeen: formatUtcDateTime(last),
     } as VTURLMetadata["dns"];
   } catch (e) {
     dlog(
@@ -831,8 +834,8 @@ async function fetchPassiveDnsForIP(ip: string) {
 
     return {
       count: rows.length,
-      firstSeen: toISODate(first),
-      lastSeen: toISODate(last),
+      firstSeen: formatUtcDateTime(first),
+      lastSeen: formatUtcDateTime(last),
     } as VTURLMetadata["dns"];
   } catch (e) {
     dlog("passive DNS (ip) fetch failed:", (e as any)?.message || String(e));
@@ -1301,9 +1304,6 @@ async function buildVTMetadata(
       (certAttributes as any).not_after ??
       (certAttributes as any).validity_not_after;
 
-    const toIso = (v: any) =>
-      typeof v === "number" ? new Date(v * 1000).toISOString() : v;
-
     // SAN extraction: VT may provide as string or array under different keys
     let sanEntries: string[] | null = null;
     const sanSrc =
@@ -1335,9 +1335,7 @@ async function buildVTMetadata(
         ? null
         : undefined;
     const sanEntriesSimilarity = Array.isArray(sanEntries)
-      ? sanEntries.length > 1
-        ? avgSimilarity(sanEntries)
-        : 1
+      ? avgSimilarity(sanEntries)
       : sanEntries === null
       ? null
       : undefined;
@@ -1355,12 +1353,15 @@ async function buildVTMetadata(
       (certAttributes as any).serial ??
       undefined;
 
-    if (issuerStr && subjectStr && nbRaw && naRaw && serial) {
+    const validFrom = formatUtcDateTime(nbRaw);
+    const validTo = formatUtcDateTime(naRaw);
+
+    if (issuerStr && subjectStr && validFrom && validTo && serial) {
       tlsInfo = {
         issuer: issuerStr,
         subject: subjectStr,
-        validFrom: toIso(nbRaw),
-        validTo: toIso(naRaw),
+        validFrom,
+        validTo,
         serialNumber: serial,
         fingerprint,
         sanEntriesCount,
