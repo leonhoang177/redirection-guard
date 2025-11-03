@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       psl:
         specifier: ^1.15.0
         version: 1.15.0
@@ -234,6 +237,10 @@ packages:
     resolution: {integrity: sha512-58lmxKSA4BNyLz+HHMUzlOEpg09FV+ev6ZMe3vJihgdxzgcwZ8VoEEPmALCZG9LmqfVoNMMKpttIYTVG6uDY7A==}
     engines: {node: '>=0.3.1'}
 
+  dotenv@16.6.1:
+    resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
+    engines: {node: '>=12'}
+
   esbuild@0.25.11:
     resolution: {integrity: sha512-KohQwyzrKTQmhXDW1PjCv3Tyspn9n5GcY2RTDqeORIdIJY8yKIF7sTSopFmn/wpMPW4rdPXI0UE5LJLuq3bx0Q==}
     engines: {node: '>=18'}
@@ -417,6 +424,8 @@ snapshots:
   create-require@1.1.1: {}
 
   diff@4.0.2: {}
+
+  dotenv@16.6.1: {}
 
   esbuild@0.25.11:
     optionalDependencies:

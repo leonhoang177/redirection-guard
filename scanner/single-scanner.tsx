@@ -1,3 +1,8 @@
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.local", override: true });
+dotenv.config();
+
 // Debug flag and logger
 const DEBUG = process.argv.includes("--debug");
 function dlog(...args: any[]) {
@@ -253,8 +258,7 @@ function appendToErrorLog(
 }
 
 // ====== API CONFIG ======
-const API_KEY =
-  "1d0b32a0630fc45fc0f7ef17c35421d2f56d961f97fcca7a9a135b4235268bf9";
+const API_KEY = (process.env.VT_API_KEY || "").trim();
 const BASE = "https://www.virustotal.com/api/v3";
 const HARDCODED_URL = "https://www.apple.com/";
 

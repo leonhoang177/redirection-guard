@@ -12,6 +12,7 @@
     "bscan": "tsx batch-scanner.tsx"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
     "psl": "^1.15.0",
     "tldts": "^7.0.17"
   }
