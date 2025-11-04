@@ -1,4 +1,0 @@
-order,url,label,error
-8,http://66.108.238.65/AV.scr,phish,"GET /urls/aHR0cDovLzY2LjEwOC4yMzguNjUvQVYuc2Ny -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
-9,lucky97.com,legit,"GET /urls/aHR0cHM6Ly9sdWNreTk3LmNvbQ -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
-10,http://supportsavnetfix.info/bins/nwfaiehg4ewijfgriehgirehaughrarg.i686,phish,"GET /urls/aHR0cDovL3N1cHBvcnRzYXZuZXRmaXguaW5mby9iaW5zL253ZmFpZWhnNGV3aWpmZ3JpZWhnaXJlaGF1Z2hyYXJnLmk2ODY -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"

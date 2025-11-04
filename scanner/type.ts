@@ -1,0 +1,107 @@
+export interface VTURLMetadata {
+  // Basic
+  url: string;
+  urlEntropy?: number;
+  hostname: string;
+
+  // Tools
+  reputation?: number;
+  maliciousVotes: number;
+  suspiciousVotes: number;
+  servicesKeyWords?: string;
+  suspiciousFeatures?: string;
+
+  // Redirect
+  redirect?: {
+    count: number | null;
+    entropy?: number | null;
+    similarity?: number | null;
+  };
+
+  // DNS
+  dns?: {
+    count?: number;
+    firstSeen?: string;
+    age?: number;
+    ratio?: number;
+  };
+
+  // Domain
+  domain: {
+    registrar?: string;
+    creationDate?: string;
+    expirationDate?: string;
+    age?: number;
+  };
+  domainAge?: number;
+  domainValidDays?: number;
+
+  // Network
+  network: {
+    asOwner?: string;
+    country?: string;
+  };
+
+  // HTTP
+  httpInfo: {
+    statusCode?: number;
+    contentType?: string;
+    contentLength?: number;
+    serverInfo?: string;
+    headers?: Record<string, string | number | null>;
+  };
+
+  // TLS
+  tlsInfo?: {
+    issuer: string;
+    subject: string;
+    validFrom: string;
+    validTo: string;
+    sanEntriesCount?: number | null;
+    sanEntriesEntropy?: number | null;
+    sanEntriesSimilarity?: number | null;
+  };
+  tlsValidDays?: number;
+
+  // Content
+  contentInfo: {
+    title?: string;
+    favicon?: string;
+    charset?: string;
+    mimeType?: string;
+    metaTagCount?: number;
+  };
+
+  // External Resources
+  externalResources: {
+    embeddedUrls?: string[];
+    embeddedUrlsCount?: number | null;
+    embeddedUrlsEntropy?: number | null;
+    embeddedUrlsSimilarity?: number | null;
+    trackers?: string;
+  };
+}
+
+export interface VTDomainResponse {
+  data: {
+    id: string;
+    type: string;
+    attributes: {
+      registrar?: string;
+      creation_date?: number;
+      last_update_date?: number;
+      expiration_date?: number;
+    };
+  };
+}
+export interface VTIPResponse {
+  data: {
+    id: string;
+    type: string;
+    attributes: {
+      as_owner?: string;
+      country?: string;
+      whois?: string;
+    };
+  };
+}

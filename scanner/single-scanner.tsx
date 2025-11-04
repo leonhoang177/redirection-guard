@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-
 dotenv.config({ path: ".env.local", override: true });
 dotenv.config();
 
@@ -15,119 +14,7 @@ function isForbidden(err: any): boolean {
   return msg.includes("403") || msg.toLowerCase().includes("forbidden");
 }
 // VirusTotal API Response Types
-export interface VTURLMetadata {
-  // Basic info
-  url: string;
-  urlEntropy?: number;
-  hostname: string;
-
-  // Vote info
-  reputation?: number;
-  detectionVotes: DetectionStats;
-  servicesKeyWords?: string;
-  suspiciousFeatures?: string;
-
-  // Redirection
-  redirect?: {
-    count: number | null;
-    entropy?: number | null;
-    similarity?: number | null;
-  };
-
-  // DNS
-  dns?: {
-    count?: number;
-    firstSeen?: string;
-    lastSeen?: string;
-  };
-
-  // Domain
-  domain: {
-    registrar?: string;
-    creationDate?: string;
-    expirationDate?: string;
-    age?: number | string;
-  };
-
-  // Network
-  network: {
-    asn?: string;
-    asOwner?: string;
-    country?: string;
-  };
-
-  // HTTP
-  httpInfo: {
-    statusCode?: number;
-    contentType?: string;
-    contentLength?: number;
-    serverInfo?: string;
-    headers?: Record<string, string | number | null>;
-  };
-
-  // TLS, SSL, and Certificate
-  tlsInfo?: {
-    issuer: string;
-    subject: string;
-    validFrom: string;
-    validTo: string;
-    serialNumber: string;
-    fingerprint?: string;
-    sanEntriesCount?: number | null;
-    sanEntriesEntropy?: number | null;
-    sanEntriesSimilarity?: number | null;
-  };
-
-  // Content Info
-  contentInfo: {
-    title?: string;
-    favicon?: string;
-    sha256?: string;
-    charset?: string;
-    mimeType?: string;
-    metaTagCount?: number;
-  };
-
-  // External Resources
-  externalResources: {
-    embeddedUrls?: string[];
-    embeddedUrlsCount?: number | null;
-    embeddedUrlsEntropy?: number | null;
-    embeddedUrlsSimilarity?: number | null;
-    trackers?: string;
-  };
-}
-
-export interface DetectionStats {
-  malicious: number;
-  suspicious: number;
-  harmless: number;
-  undetected: number;
-}
-export interface VTDomainResponse {
-  data: {
-    id: string;
-    type: string;
-    attributes: {
-      registrar?: string;
-      creation_date?: number;
-      last_update_date?: number;
-      expiration_date?: number;
-    };
-  };
-}
-export interface VTIPResponse {
-  data: {
-    id: string;
-    type: string;
-    attributes: {
-      asn?: number;
-      as_owner?: string;
-      country?: string;
-      whois?: string;
-    };
-  };
-}
+import { VTURLMetadata, VTDomainResponse, VTIPResponse } from "./type";
 
 // ===== Helper Functions =====
 import fs from "fs";
@@ -224,10 +111,7 @@ function appendCsvRow(
       "utf-8"
     );
   } catch (e) {
-    console.log(
-      `Could not write to ${filePath}:`,
-      (e as any)?.message || e
-    );
+    console.log(`Could not write to ${filePath}:`, (e as any)?.message || e);
   }
 }
 
@@ -244,11 +128,7 @@ function appendToWaitlist(
   ]);
 }
 
-function appendToErrorLog(
-  url: string,
-  error: string,
-  context?: ScanContext
-) {
+function appendToErrorLog(url: string, error: string, context?: ScanContext) {
   appendCsvRow(ERROR_CSV_PATH, ERROR_HEADERS, [
     context?.order ?? "",
     context?.rawUrl ?? url,
@@ -330,14 +210,16 @@ async function fetchDomainInfo(hostname: string) {
     const attr = domainResp?.data?.attributes ?? {};
     const registrar = attr.registrar;
     const creationDate = formatUtcDateTime(attr.creation_date);
+    const domainAgeDays =
+      typeof attr.creation_date === "number"
+        ? Math.max(
+            0,
+            Math.floor(
+              (Date.now() - attr.creation_date * 1000) / (1000 * 60 * 60 * 24)
+            )
+          )
+        : undefined;
     const expirationDate = formatUtcDateTime(attr.expiration_date);
-    let age: number | undefined = undefined;
-    if (attr.creation_date) {
-      const now = Date.now();
-      age = Math.floor(
-        (now - attr.creation_date * 1000) / (1000 * 60 * 60 * 24)
-      );
-    }
     const lastHttpsCert = (attr as any)?.last_https_certificate;
     // Capture the first A record (if present) to use as a network fallback
     let firstA: string | undefined;
@@ -351,7 +233,8 @@ async function fetchDomainInfo(hostname: string) {
       registrar,
       creationDate,
       expirationDate,
-      age,
+      domainAge: domainAgeDays,
+      age: domainAgeDays,
       _lastHttpsCert: lastHttpsCert,
       _firstA: firstA,
     } as any;
@@ -361,6 +244,7 @@ async function fetchDomainInfo(hostname: string) {
       registrar: ABSENT,
       creationDate: ABSENT,
       expirationDate: ABSENT,
+      domainAge: ABSENT,
       age: ABSENT,
       _lastHttpsCert: undefined,
       _firstA: undefined,
@@ -394,13 +278,11 @@ async function fetchIPInfo(ip: string): Promise<VTURLMetadata["network"]> {
     }
 
     return {
-      asn: attr.asn ? String(attr.asn) : undefined,
       asOwner,
       country,
     };
   } catch {
     return {
-      asn: ABSENT as any,
       asOwner: ABSENT as any,
       country: ABSENT as any,
     };
@@ -448,11 +330,7 @@ async function fetchCertificateById(ref: any) {
     const id =
       typeof ref === "string"
         ? ref
-        : ref?.id ||
-          ref?.certificate_id ||
-          ref?.sha256 ||
-          ref?.sha1 ||
-          undefined;
+        : ref?.id || ref?.certificate_id || undefined;
     if (!id) return undefined;
     const cert = await vtGet(`/ssl_certificates/${id}`);
     return cert?.data?.attributes;
@@ -853,6 +731,38 @@ function formatUtcDateTime(value: any): string | undefined {
   return iso.replace(/\.\d{3}Z$/, "Z");
 }
 
+function calculateDaysSince(
+  value: string | number | undefined
+): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  let timestamp: number;
+  if (typeof value === "number") {
+    timestamp = value > 1e12 ? value : value * 1000;
+  } else {
+    const parsed = Date.parse(value);
+    if (Number.isNaN(parsed)) return undefined;
+    timestamp = parsed;
+  }
+  const diff = Date.now() - timestamp;
+  if (!Number.isFinite(diff) || diff < 0) return undefined;
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+function computeDaysBetween(
+  validFrom?: string,
+  validTo?: string
+): number | undefined {
+  if (!validFrom || !validTo) return undefined;
+  const from = Date.parse(validFrom);
+  const to = Date.parse(validTo);
+  if (Number.isNaN(from) || Number.isNaN(to) || to <= from) return undefined;
+  const now = Date.now();
+  const start = Math.max(from, now);
+  const remainingMs = to - start;
+  if (remainingMs <= 0) return 0;
+  return Math.floor(remainingMs / (1000 * 60 * 60 * 24));
+}
+
 async function fetchPassiveDnsForDomain(hostname: string) {
   try {
     // Prefer the documented /resolutions resource; limit to a sane page
@@ -873,7 +783,6 @@ async function fetchPassiveDnsForDomain(hostname: string) {
     return {
       count: rows.length,
       firstSeen: formatUtcDateTime(first),
-      lastSeen: formatUtcDateTime(last),
     } as VTURLMetadata["dns"];
   } catch (e) {
     dlog(
@@ -903,7 +812,6 @@ async function fetchPassiveDnsForIP(ip: string) {
     return {
       count: rows.length,
       firstSeen: formatUtcDateTime(first),
-      lastSeen: formatUtcDateTime(last),
     } as VTURLMetadata["dns"];
   } catch (e) {
     dlog("passive DNS (ip) fetch failed:", (e as any)?.message || String(e));
@@ -938,10 +846,8 @@ async function buildVTMetadata(
     ),
     "x-frame-options": getHeaderCI(rawHeaders, "x-frame-options"),
     "x-content-type-options": getHeaderCI(rawHeaders, "x-content-type-options"),
-    "referrer-policy": getHeaderCI(rawHeaders, "referrer-policy"),
     server: getHeaderCI(rawHeaders, "server"),
     "cache-control": getHeaderCI(rawHeaders, "cache-control"),
-    "x-powered-by": getHeaderCI(rawHeaders, "x-powered-by"),
   };
   // Build headers map allowing string | number | null (temporary)
   const tempHeaders: Record<string, string | number | null> =
@@ -1049,7 +955,6 @@ async function buildVTMetadata(
   const contentInfo = {
     title: attr.title ?? undefined,
     favicon,
-    sha256: attr.last_http_response_content_sha256 ?? undefined,
     charset,
     mimeType,
     metaTagCount,
@@ -1172,20 +1077,10 @@ async function buildVTMetadata(
     certAttributes && Object.keys(certAttributes)
   );
 
-  // Detection Stats
-  const lastStats = attr.last_analysis_stats ?? {};
-  const malicious = lastStats.malicious ?? 0;
-  const suspicious = lastStats.suspicious ?? 0;
-  const harmless = lastStats.harmless ?? 0;
-  const undetected = lastStats.undetected ?? 0;
-  const total = malicious + suspicious + harmless + undetected;
-
-  const detectionVotes: DetectionStats = {
-    malicious,
-    suspicious,
-    harmless,
-    undetected,
-  };
+  // Votes
+  const lastStats = attr?.last_analysis_stats ?? null;
+  const maliciousCount = lastStats?.malicious ?? null;
+  const suspiciousCount = lastStats?.suspicious ?? null;
 
   // Threat info
   const scValues: string[] | undefined = attr.categories
@@ -1258,12 +1153,10 @@ async function buildVTMetadata(
 
   // Passive DNS
   let dns: VTURLMetadata["dns"] | undefined = undefined;
+
   try {
     const pdDomain = await fetchPassiveDnsForDomain(hostname);
-    if (
-      pdDomain &&
-      (pdDomain.firstSeen || pdDomain.lastSeen || pdDomain.count)
-    ) {
+    if (pdDomain && (pdDomain.firstSeen || pdDomain.count)) {
       dns = pdDomain;
     }
   } catch {}
@@ -1273,11 +1166,19 @@ async function buildVTMetadata(
     const ipForDns = attr.last_serving_ip_address;
     if (!dns && ipForDns) {
       const pdIp = await fetchPassiveDnsForIP(ipForDns);
-      if (pdIp && (pdIp.firstSeen || pdIp.lastSeen || pdIp.count)) {
+      if (pdIp && (pdIp.firstSeen || pdIp.count)) {
         dns = pdIp;
       }
     }
   } catch {}
+
+  if (dns && dns?.firstSeen && dns.firstSeen !== ABSENT) {
+    dns.age = calculateDaysSince(dns.firstSeen);
+  }
+
+  if (dns && dns.age && dns.count && dns.count !== 0) {
+    dns.ratio = dns.age / dns.count;
+  }
 
   // Decide serving IP using multiple fallbacks
   let servingIp: string | undefined =
@@ -1308,7 +1209,6 @@ async function buildVTMetadata(
 
   // Build network object with all keys present so deepMarkAbsent won't leave `{}`
   let network: VTURLMetadata["network"] = {
-    asn: undefined,
     asOwner: undefined,
     country: undefined,
   };
@@ -1316,7 +1216,6 @@ async function buildVTMetadata(
   if (servingIp) {
     const ipInfo = await fetchIPInfo(servingIp);
     network = {
-      asn: ipInfo.asn,
       asOwner: ipInfo.asOwner,
       country: ipInfo.country,
     };
@@ -1408,30 +1307,15 @@ async function buildVTMetadata(
       ? null
       : undefined;
 
-    const fingerprint =
-      (certAttributes as any).thumbprint_sha256 ??
-      (certAttributes as any).thumbprint ??
-      (certAttributes as any).sha256 ??
-      (certAttributes as any).fingerprint ??
-      undefined;
-
-    const serial =
-      (certAttributes as any).serial_number ??
-      (certAttributes as any).serialNumber ??
-      (certAttributes as any).serial ??
-      undefined;
-
     const validFrom = formatUtcDateTime(nbRaw);
     const validTo = formatUtcDateTime(naRaw);
 
-    if (issuerStr && subjectStr && validFrom && validTo && serial) {
+    if (issuerStr && subjectStr && validFrom && validTo) {
       tlsInfo = {
         issuer: issuerStr,
         subject: subjectStr,
         validFrom,
         validTo,
-        serialNumber: serial,
-        fingerprint,
         sanEntriesCount,
         sanEntriesEntropy,
         sanEntriesSimilarity,
@@ -1439,32 +1323,73 @@ async function buildVTMetadata(
       dlog("tlsInfo:", tlsInfo);
     } else {
       dlog(
-        "tlsInfo not fully populated (missing one of issuer/subject/validity/serial)"
+        "tlsInfo not fully populated (missing one of issuer/subject/validity)"
       );
     }
   }
 
+  const domainAgeDays =
+    domain?.creationDate && domain.creationDate !== ABSENT
+      ? calculateDaysSince(domain.creationDate)
+      : typeof (domain as any)?.domainAge === "number"
+      ? (domain as any).domainAge
+      : undefined;
+
+  const domainValidDays =
+    domain?.creationDate &&
+    domain.creationDate !== ABSENT &&
+    domain?.expirationDate &&
+    domain.expirationDate !== ABSENT
+      ? computeDaysBetween(domain?.creationDate, domain?.expirationDate)
+      : undefined;
+
+  const tlsValidDays = computeDaysBetween(tlsInfo?.validFrom, tlsInfo?.validTo);
+
   const metadata: VTURLMetadata = {
-    reputation: attr.reputation ?? undefined,
+    // Basic
     url,
     urlEntropy,
     hostname,
+
+    // Votes
+    reputation: attr?.reputation ?? null,
+    maliciousVotes: maliciousCount,
+    suspiciousVotes: suspiciousCount,
+    servicesKeyWords,
+    suspiciousFeatures,
+
+    // Redirect
     redirect,
-    detectionVotes,
+
+    // DNS
+    dns,
+
+    // Domain
     domain: {
       registrar: domain.registrar,
       creationDate: domain.creationDate,
       expirationDate: domain.expirationDate,
-      age: domain.age,
+      age: domainAgeDays,
     },
+
+    // Network
     network,
+
+    // HTTP
     httpInfo,
+
+    // TLS
     tlsInfo,
+
+    // Content
     contentInfo,
-    servicesKeyWords,
-    suspiciousFeatures,
+
+    // External Resources
     externalResources,
-    dns,
+
+    domainAge: domainAgeDays,
+    domainValidDays,
+    tlsValidDays,
   };
 
   return metadata;
@@ -1473,118 +1398,8 @@ async function buildVTMetadata(
 function finalizeOutput(metadata: VTURLMetadata): Record<string, any> {
   const output = deepMarkAbsent(metadata);
   const flattenedOutput = flattenObject(output);
-  const renameMap: Record<string, string> = {
-    detectionVotesMalicious: "maliciousVotes",
-    detectionVotesSuspicious: "suspiciousVotes",
-    detectionVotesHarmless: "harmlessVotes",
-    detectionVotesUndetected: "undetectedVotes",
-    "httpInfoHeadersContent-security-policy-count":
-      "contentSecurityPolicyCount",
-    "httpInfoHeadersStrict-transport-security": "strictTransportSecurity",
-    "httpInfoHeadersX-frame-options": "xFrameOptions",
-    "httpInfoHeadersX-content-type-options": "xContentTypeOptions",
-    "httpInfoHeadersReferrer-policy": "referrerPolicy",
-    httpInfoHeadersServer: "hostingServer",
-    "httpInfoHeadersCache-control": "cacheControlPolicy",
-    "httpInfoHeadersX-powered-by": "xPoweredBy",
-    httpInfoStatusCode: "statusCode",
-    httpInfoContentLength: "contentSize",
-    httpInfoServerInfo: "serverInfo",
-    httpInfoHsts: "hstsEnable",
-    tlsInfoIssuer: "tlsIssuer",
-    tlsInfoSubject: "tlsSubject",
-    tlsInfoValidFrom: "tlsValidFrom",
-    tlsInfoValidTo: "tlsValidTo",
-    tlsInfoSerialNumber: "tlsSerialNumber",
-    tlsInfoFingerprint: "tlsFingerprint",
-    tlsInfoSanEntriesCount: "sanEntriesCount",
-    tlsInfoSanEntriesEntropy: "sanEntriesEntropy",
-    tlsInfoSanEntriesSimilarity: "sanEntriesSimilarity",
-    externalResourcesEmbeddedUrlsCount: "embeddedUrlsCount",
-    externalResourcesEmbeddedUrlsEntropy: "embeddedUrlsEntropy",
-    externalResourcesEmbeddedUrlsSimilarity: "embeddedUrlsSimilarity",
-    externalResourcesTrackers: "trackers",
-  };
-  for (const [oldKey, newKey] of Object.entries(renameMap)) {
-    if (Object.prototype.hasOwnProperty.call(flattenedOutput, oldKey)) {
-      flattenedOutput[newKey] = flattenedOutput[oldKey];
-      delete flattenedOutput[oldKey];
-    }
-  }
 
-  const orderedOutput: Record<string, any> = {};
-  const remaining = new Map(Object.entries(flattenedOutput));
-
-  const consumeKey = (key: string) => {
-    if (remaining.has(key)) {
-      orderedOutput[key] = remaining.get(key);
-      remaining.delete(key);
-    }
-  };
-
-  const consumeKeys = (keys: string[]) => {
-    for (const key of keys) consumeKey(key);
-  };
-
-  const consumePrefix = (prefix: string) => {
-    const keys = Array.from(remaining.keys())
-      .filter((k) => k.startsWith(prefix))
-      .sort();
-    for (const key of keys) consumeKey(key);
-  };
-
-  consumeKeys(["scanId", "url", "urlEntropy", "hostname", "path"]);
-
-  consumeKeys([
-    "reputation",
-    "maliciousVotes",
-    "suspiciousVotes",
-    "harmlessVotes",
-    "undetectedVotes",
-    "servicesKeyWords",
-    "suspiciousFeatures",
-  ]);
-
-  consumePrefix("redirect");
-  consumeKeys(["dnsCount", "dnsFirstSeen", "dnsLastSeen"]);
-  consumePrefix("domain");
-  consumePrefix("network");
-
-  consumeKeys([
-    "statusCode",
-    "contentSize",
-    "serverInfo",
-    "hstsEnable",
-    "hostingServer",
-    "referrerPolicy",
-    "contentSecurityPolicyCount",
-    "strictTransportSecurity",
-    "cacheControlPolicy",
-    "xFrameOptions",
-    "xContentTypeOptions",
-    "xPoweredBy",
-  ]);
-
-  consumeKeys(["tlsIssuer", "tlsSubject", "tlsValidFrom", "tlsValidTo"]);
-  consumeKeys(["tlsSerialNumber", "tlsFingerprint"]);
-
-  consumePrefix("tls");
-  consumePrefix("san");
-  consumePrefix("certificateInfo");
-  consumePrefix("contentInfo");
-
-  consumePrefix("embeddedUrls");
-  consumePrefix("externalResources");
-  consumePrefix("trackers");
-  consumePrefix("passiveDns");
-
-  for (const [key, value] of Array.from(remaining.entries()).sort((a, b) =>
-    a[0].localeCompare(b[0])
-  )) {
-    orderedOutput[key] = value;
-  }
-
-  return orderedOutput;
+  return flattenedOutput;
 }
 
 export async function scanUrl(
@@ -1641,13 +1456,8 @@ export async function scanUrl(
     );
     let flattened = finalizeOutput(metadata);
 
-    if (
-      flattened.statusCode === null ||
-      flattened.statusCode === undefined
-    ) {
-      console.log(
-        "statusCode missing; retrying with http:// prefix fallback."
-      );
+    if (flattened.statusCode === null || flattened.statusCode === undefined) {
+      console.log("statusCode missing; retrying with http:// prefix fallback.");
       const normalizedHttp = ensureScheme(target, "http");
       try {
         const reportHttp = await getUrlReport(normalizedHttp);
@@ -1661,10 +1471,7 @@ export async function scanUrl(
           );
         }
       } catch (err: any) {
-        console.log(
-          "HTTP fallback failed:",
-          err?.message || String(err)
-        );
+        console.log("HTTP fallback failed:", err?.message || String(err));
       }
     }
 

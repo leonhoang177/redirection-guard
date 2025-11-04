@@ -7,8 +7,9 @@ import {
   ERROR_CSV_PATH,
 } from "./single-scanner";
 
-const INPUT_PATH = "./inputs/mixed_urls_10.csv";
+const INPUT_PATH = "./inputs/mixed_urls_4.csv";
 const OUTPUT_PATH = "./outputs/output.jsonl";
+const INSTRUCTION_PATH = "./inputs/instruction.txt";
 
 function parseDelimitedLine(line: string): string[] {
   const cells: string[] = [];
@@ -35,7 +36,10 @@ function parseDelimitedLine(line: string): string[] {
   return cells;
 }
 
-function formatInputText(flattened: Record<string, any>): string {
+function formatInputText(
+  flattened: Record<string, any>,
+  instruction?: string
+): string {
   const entries = Object.entries(flattened);
   const parts = entries.map(([key, value]) => {
     if (value === null) return `${key}=null`;
@@ -44,10 +48,21 @@ function formatInputText(flattened: Record<string, any>): string {
       return `${key}=${value}`;
     return `${key}=${JSON.stringify(value)}`;
   });
-  return parts.join(" | ");
+  const body = parts.join(" | ");
+  if (instruction && instruction.length > 0) {
+    return `INSTRUCTION: ${instruction} | DATA: ${body}`;
+  }
+  return `DATA: ${body}`;
 }
 
 async function runBatch() {
+  let instruction = "";
+  try {
+    instruction = fs.readFileSync(INSTRUCTION_PATH, "utf-8").trim();
+  } catch {
+    instruction = "";
+  }
+
   let input: string;
   try {
     input = fs.readFileSync(INPUT_PATH, "utf-8");
@@ -87,10 +102,7 @@ async function runBatch() {
         fs.unlinkSync(logPath);
       }
     } catch (err: any) {
-      console.error(
-        `Failed to reset ${logPath}:`,
-        err?.message || String(err)
-      );
+      console.error(`Failed to reset ${logPath}:`, err?.message || String(err));
     }
   }
 
@@ -115,7 +127,7 @@ async function runBatch() {
       });
       if (result.status === "success") {
         const record = {
-          input_text: formatInputText(result.data),
+          input_text: formatInputText(result.data, instruction),
           output_text: label ?? "",
         };
         fs.appendFileSync(OUTPUT_PATH, `${JSON.stringify(record)}\n`, "utf-8");
