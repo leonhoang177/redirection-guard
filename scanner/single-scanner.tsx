@@ -64,24 +64,6 @@ function isPlainObject(value: any): value is Record<string, any> {
   return proto === Object.prototype || proto === null;
 }
 
-function flattenObject(
-  value: Record<string, any>,
-  parentKey = ""
-): Record<string, any> {
-  const flat: Record<string, any> = {};
-  for (const [key, current] of Object.entries(value)) {
-    const nextKey = parentKey
-      ? `${parentKey}${capitalizeKeySegment(key)}`
-      : key;
-    if (isPlainObject(current)) {
-      Object.assign(flat, flattenObject(current, nextKey));
-    } else {
-      flat[nextKey] = current;
-    }
-  }
-  return flat;
-}
-
 function csvEscape(value: string | undefined): string {
   if (value === undefined || value === null) return "";
   const str = String(value);
@@ -229,25 +211,19 @@ async function fetchDomainInfo(hostname: string) {
       if (a?.value) firstA = String(a.value);
     }
     return {
-      _queriedBase: base,
       registrar,
       creationDate,
       expirationDate,
       domainAge: domainAgeDays,
       age: domainAgeDays,
-      _lastHttpsCert: lastHttpsCert,
-      _firstA: firstA,
     } as any;
   } catch {
     return {
-      _queriedBase: getRegistrableDomain(hostname) || hostname,
       registrar: ABSENT,
       creationDate: ABSENT,
       expirationDate: ABSENT,
       domainAge: ABSENT,
       age: ABSENT,
-      _lastHttpsCert: undefined,
-      _firstA: undefined,
     } as any;
   }
 }
@@ -1345,32 +1321,31 @@ async function buildVTMetadata(
 
   const tlsValidDays = computeDaysBetween(tlsInfo?.validFrom, tlsInfo?.validTo);
 
-  const metadata: VTURLMetadata = {
+  const outputFormat: any = {
     // Basic
     url,
     urlEntropy,
     hostname,
 
     // Votes
-    reputation: attr?.reputation ?? null,
+    reputation: attr?.reputation ?? ABSENT,
     maliciousVotes: maliciousCount,
     suspiciousVotes: suspiciousCount,
     servicesKeyWords,
     suspiciousFeatures,
 
     // Redirect
-    redirect,
+    redirectCount: redirect?.count ?? ABSENT,
+    redirectEntropy: redirect?.entropy ?? ABSENT,
+    redirectSimi: redirect?.similarity ?? ABSENT,
 
     // DNS
-    dns,
+    dnsRatio: dns?.ratio ?? ABSENT,
 
     // Domain
-    domain: {
-      registrar: domain.registrar,
-      creationDate: domain.creationDate,
-      expirationDate: domain.expirationDate,
-      age: domainAgeDays,
-    },
+    domainRegistrar: domain?.registrar ?? ABSENT,
+    domainAge: domainAgeDays ?? ABSENT,
+    domainValidDays: domainValidDays ?? ABSENT,
 
     // Network
     network,
@@ -1386,20 +1361,17 @@ async function buildVTMetadata(
 
     // External Resources
     externalResources,
-
-    domainAge: domainAgeDays,
-    domainValidDays,
     tlsValidDays,
   };
 
-  return metadata;
+  return outputFormat;
 }
 
-function finalizeOutput(metadata: VTURLMetadata): Record<string, any> {
-  const output = deepMarkAbsent(metadata);
-  const flattenedOutput = flattenObject(output);
+function finalizeOutput(outputFormat: any): Record<string, any> {
+  const output = deepMarkAbsent(outputFormat);
+  //const flattenedOutput = flattenObject(output);
 
-  return flattenedOutput;
+  return output;
 }
 
 export async function scanUrl(
@@ -1450,21 +1422,24 @@ export async function scanUrl(
       return { status: "waitlist", note: "analysis not complete" };
     }
 
-    let metadata: VTURLMetadata = await buildVTMetadata(
+    let outputFormat: VTURLMetadata = await buildVTMetadata(
       normalizedHttps,
       urlReport
     );
-    let flattened = finalizeOutput(metadata);
+    let flattened = finalizeOutput(outputFormat);
 
-    if (flattened.statusCode === null || flattened.statusCode === undefined) {
+    if (
+      flattened.httpInfo.statusCode === null ||
+      flattened.httpInfo.statusCode === undefined
+    ) {
       console.log("statusCode missing; retrying with http:// prefix fallback.");
       const normalizedHttp = ensureScheme(target, "http");
       try {
         const reportHttp = await getUrlReport(normalizedHttp);
         const attrHttp = reportHttp?.data?.attributes ?? {};
         if (attrHttp && attrHttp.last_analysis_stats) {
-          metadata = await buildVTMetadata(normalizedHttp, reportHttp);
-          flattened = finalizeOutput(metadata);
+          outputFormat = await buildVTMetadata(normalizedHttp, reportHttp);
+          flattened = finalizeOutput(outputFormat);
         } else {
           console.log(
             "HTTP fallback also lacks analysis stats; keeping HTTPS result."

@@ -32,9 +32,8 @@ export interface VTURLMetadata {
     creationDate?: string;
     expirationDate?: string;
     age?: number;
+    validDays?: number;
   };
-  domainAge?: number;
-  domainValidDays?: number;
 
   // Network
   network: {
