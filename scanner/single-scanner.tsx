@@ -64,24 +64,6 @@ function isPlainObject(value: any): value is Record<string, any> {
   return proto === Object.prototype || proto === null;
 }
 
-function flattenObject(
-  value: Record<string, any>,
-  parentKey = ""
-): Record<string, any> {
-  const flat: Record<string, any> = {};
-  for (const [key, current] of Object.entries(value)) {
-    const nextKey = parentKey
-      ? `${parentKey}${capitalizeKeySegment(key)}`
-      : key;
-    if (isPlainObject(current)) {
-      Object.assign(flat, flattenObject(current, nextKey));
-    } else {
-      flat[nextKey] = current;
-    }
-  }
-  return flat;
-}
-
 function csvEscape(value: string | undefined): string {
   if (value === undefined || value === null) return "";
   const str = String(value);
@@ -229,25 +211,19 @@ async function fetchDomainInfo(hostname: string) {
       if (a?.value) firstA = String(a.value);
     }
     return {
-      _queriedBase: base,
       registrar,
       creationDate,
       expirationDate,
       domainAge: domainAgeDays,
       age: domainAgeDays,
-      _lastHttpsCert: lastHttpsCert,
-      _firstA: firstA,
     } as any;
   } catch {
     return {
-      _queriedBase: getRegistrableDomain(hostname) || hostname,
       registrar: ABSENT,
       creationDate: ABSENT,
       expirationDate: ABSENT,
       domainAge: ABSENT,
       age: ABSENT,
-      _lastHttpsCert: undefined,
-      _firstA: undefined,
     } as any;
   }
 }
@@ -1382,14 +1358,14 @@ async function buildVTMetadata(
 
   const tlsValidDays = computeDaysBetween(tlsInfo?.validFrom, tlsInfo?.validTo);
 
-  const metadata: VTURLMetadata = {
+  const outputFormat: any = {
     // Basic
     url,
     urlEntropy,
     hostname,
 
     // Votes
-    reputation: attr?.reputation ?? null,
+    reputation: attr?.reputation ?? ABSENT,
     maliciousVotes: maliciousCount,
     suspiciousVotes: suspiciousCount,
     servicesKeyWords,
@@ -1455,14 +1431,14 @@ async function buildVTMetadata(
     },
   };
 
-  return metadata;
+  return outputFormat;
 }
 
-function finalizeOutput(metadata: VTURLMetadata): Record<string, any> {
-  const output = deepMarkAbsent(metadata);
-  const flattenedOutput = flattenObject(output);
+function finalizeOutput(outputFormat: any): Record<string, any> {
+  const output = deepMarkAbsent(outputFormat);
+  //const flattenedOutput = flattenObject(output);
 
-  return flattenedOutput;
+  return output;
 }
 
 export async function scanUrl(
