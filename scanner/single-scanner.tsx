@@ -64,6 +64,24 @@ function isPlainObject(value: any): value is Record<string, any> {
   return proto === Object.prototype || proto === null;
 }
 
+function flattenObject(
+  value: Record<string, any>,
+  parentKey = ""
+): Record<string, any> {
+  const flat: Record<string, any> = {};
+  for (const [key, current] of Object.entries(value)) {
+    const nextKey = parentKey
+      ? `${parentKey}${capitalizeKeySegment(key)}`
+      : key;
+    if (isPlainObject(current)) {
+      Object.assign(flat, flattenObject(current, nextKey));
+    } else {
+      flat[nextKey] = current;
+    }
+  }
+  return flat;
+}
+
 function csvEscape(value: string | undefined): string {
   if (value === undefined || value === null) return "";
   const str = String(value);
@@ -211,19 +229,25 @@ async function fetchDomainInfo(hostname: string) {
       if (a?.value) firstA = String(a.value);
     }
     return {
+      _queriedBase: base,
       registrar,
       creationDate,
       expirationDate,
       domainAge: domainAgeDays,
       age: domainAgeDays,
+      _lastHttpsCert: lastHttpsCert,
+      _firstA: firstA,
     } as any;
   } catch {
     return {
+      _queriedBase: getRegistrableDomain(hostname) || hostname,
       registrar: ABSENT,
       creationDate: ABSENT,
       expirationDate: ABSENT,
       domainAge: ABSENT,
       age: ABSENT,
+      _lastHttpsCert: undefined,
+      _firstA: undefined,
     } as any;
   }
 }
@@ -595,53 +619,16 @@ function parseServerTiming(header: string | undefined): number | undefined {
 }
 
 // Case-insensitive header getter
-function normalizeHeaderValue(
-  value: unknown,
-  seen?: WeakSet<object>
-): string | undefined {
-  if (value == null) return undefined;
-  if (typeof value === "string") return value;
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const normalized = normalizeHeaderValue(item, seen);
-      if (normalized) return normalized;
-    }
-    return undefined;
-  }
-  if (typeof value === "object") {
-    const set = seen ?? new WeakSet<object>();
-    const obj = value as object;
-    if (set.has(obj)) return undefined;
-    set.add(obj);
-    const candidate = (value as any).value;
-    const normalizedCandidate = normalizeHeaderValue(candidate, set);
-    if (normalizedCandidate !== undefined) return normalizedCandidate;
-    for (const entry of Object.values(value as any)) {
-      if (entry === value) continue;
-      const normalized = normalizeHeaderValue(entry, set);
-      if (normalized !== undefined) return normalized;
-    }
-    return undefined;
-  }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  return undefined;
-}
-
 function getHeaderCI(
   headers: Record<string, string | number | null> | undefined,
   name: string
 ): string | undefined {
   if (!headers) return undefined;
-  const direct = normalizeHeaderValue((headers as any)[name]);
-  if (direct !== undefined) return direct;
+  const direct = (headers as any)[name];
+  if (typeof direct === "string") return direct;
   const target = name.toLowerCase();
   for (const k of Object.keys(headers)) {
-    if (k.toLowerCase() === target) {
-      const value = normalizeHeaderValue((headers as any)[k]);
-      if (value !== undefined) return value;
-    }
+    if (k.toLowerCase() === target) return (headers as any)[k];
   }
   return undefined;
 }
@@ -1358,99 +1345,80 @@ async function buildVTMetadata(
 
   const tlsValidDays = computeDaysBetween(tlsInfo?.validFrom, tlsInfo?.validTo);
 
-  const outputFormat: any = {
+  const metadata: VTURLMetadata = {
     // Basic
     url,
     urlEntropy,
     hostname,
 
     // Votes
-    reputation: attr?.reputation ?? ABSENT,
+    reputation: attr?.reputation ?? null,
     maliciousVotes: maliciousCount,
     suspiciousVotes: suspiciousCount,
     servicesKeyWords,
     suspiciousFeatures,
 
     // Redirect
-    redirect: {
-      count: redirect?.count,
-      entropy: redirect?.entropy,
-      similarity: redirect?.similarity,
-    },
+    redirect,
 
     // DNS
-    dns: {
-      ratio: dns?.ratio,
-    },
+    dns,
 
     // Domain
     domain: {
       registrar: domain.registrar,
+      creationDate: domain.creationDate,
+      expirationDate: domain.expirationDate,
       age: domainAgeDays,
-      validDays: domainValidDays,
     },
 
     // Network
-    network: {
-      asOwner: network?.asOwner,
-      country: network?.country,
-    },
+    network,
 
     // HTTP
-    httpInfo: {
-      statusCode: httpInfo?.statusCode,
-      serverInfo: httpInfo?.serverInfo,
-      headers: httpInfo?.headers,
-    },
+    httpInfo,
 
     // TLS
-    tlsInfo: {
-      issuer: tlsInfo?.issuer,
-      subject: tlsInfo?.subject,
-      validDays: tlsValidDays,
-      sanEntriesCount: tlsInfo?.sanEntriesCount,
-      sanEntriesEntropy: tlsInfo?.sanEntriesEntropy,
-      sanEntriesSimilarity: tlsInfo?.sanEntriesSimilarity,
-    },
+    tlsInfo,
 
     // Content
-    contentInfo: {
-      title: contentInfo?.title,
-      favicon: contentInfo?.favicon,
-      charset: contentInfo?.charset,
-      mimeType: contentInfo?.mimeType,
-      metaTagCount: contentInfo?.metaTagCount,
-    },
+    contentInfo,
 
     // External Resources
-    externalResources: {
-      embeddedUrlsCount: externalResources?.embeddedUrlsCount,
-      embeddedUrlsEntropy: externalResources?.embeddedUrlsEntropy,
-      embeddedUrlsSimilarity: externalResources?.embeddedUrlsSimilarity,
-      trackers: externalResources?.trackers,
-    },
+    externalResources,
+
+    domainAge: domainAgeDays,
+    domainValidDays,
+    tlsValidDays,
   };
 
-  return outputFormat;
+  return metadata;
 }
 
-function finalizeOutput(outputFormat: any): Record<string, any> {
-  const output = deepMarkAbsent(outputFormat);
-  //const flattenedOutput = flattenObject(output);
+function finalizeOutput(metadata: VTURLMetadata): Record<string, any> {
+  const output = deepMarkAbsent(metadata);
+  const flattenedOutput = flattenObject(output);
 
-  return output;
+  return flattenedOutput;
 }
 
 export async function scanUrl(
   target: string,
   context: ScanContext = {}
 ): Promise<ScanResult> {
-  console.log(`VirusTotal URL scan for: ${target}`);
+  const ensureScheme = (url: string, scheme: "https" | "http"): string => {
+    if (!url) return url;
+    if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) return url;
+    return `${scheme}://${url}`;
+  };
+
+  const normalizedHttps = ensureScheme(target, "https");
+  console.log(`VirusTotal URL scan for: ${normalizedHttps}`);
 
   try {
     let urlReport: any | null = null;
     try {
-      urlReport = await getUrlReport(target);
+      urlReport = await getUrlReport(normalizedHttps);
     } catch (e: any) {
       const message = e?.message || String(e);
       const isNotFound = message.includes("404");
@@ -1459,7 +1427,7 @@ export async function scanUrl(
           "No existing VirusTotal report — submitting to VT and waitlisting."
         );
         try {
-          await submitUrl(target);
+          await submitUrl(normalizedHttps);
         } catch (_) {
           // ignore submission failures; still waitlist the URL
         }
@@ -1482,8 +1450,30 @@ export async function scanUrl(
       return { status: "waitlist", note: "analysis not complete" };
     }
 
-    let metadata: VTURLMetadata = await buildVTMetadata(target, urlReport);
+    let metadata: VTURLMetadata = await buildVTMetadata(
+      normalizedHttps,
+      urlReport
+    );
     let flattened = finalizeOutput(metadata);
+
+    if (flattened.statusCode === null || flattened.statusCode === undefined) {
+      console.log("statusCode missing; retrying with http:// prefix fallback.");
+      const normalizedHttp = ensureScheme(target, "http");
+      try {
+        const reportHttp = await getUrlReport(normalizedHttp);
+        const attrHttp = reportHttp?.data?.attributes ?? {};
+        if (attrHttp && attrHttp.last_analysis_stats) {
+          metadata = await buildVTMetadata(normalizedHttp, reportHttp);
+          flattened = finalizeOutput(metadata);
+        } else {
+          console.log(
+            "HTTP fallback also lacks analysis stats; keeping HTTPS result."
+          );
+        }
+      } catch (err: any) {
+        console.log("HTTP fallback failed:", err?.message || String(err));
+      }
+    }
 
     return { status: "success", data: flattened };
   } catch (err: any) {
