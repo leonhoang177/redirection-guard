@@ -619,16 +619,53 @@ function parseServerTiming(header: string | undefined): number | undefined {
 }
 
 // Case-insensitive header getter
+function normalizeHeaderValue(
+  value: unknown,
+  seen?: WeakSet<object>
+): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const normalized = normalizeHeaderValue(item, seen);
+      if (normalized) return normalized;
+    }
+    return undefined;
+  }
+  if (typeof value === "object") {
+    const set = seen ?? new WeakSet<object>();
+    const obj = value as object;
+    if (set.has(obj)) return undefined;
+    set.add(obj);
+    const candidate = (value as any).value;
+    const normalizedCandidate = normalizeHeaderValue(candidate, set);
+    if (normalizedCandidate !== undefined) return normalizedCandidate;
+    for (const entry of Object.values(value as any)) {
+      if (entry === value) continue;
+      const normalized = normalizeHeaderValue(entry, set);
+      if (normalized !== undefined) return normalized;
+    }
+    return undefined;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return undefined;
+}
+
 function getHeaderCI(
   headers: Record<string, string | number | null> | undefined,
   name: string
 ): string | undefined {
   if (!headers) return undefined;
-  const direct = (headers as any)[name];
-  if (typeof direct === "string") return direct;
+  const direct = normalizeHeaderValue((headers as any)[name]);
+  if (direct !== undefined) return direct;
   const target = name.toLowerCase();
   for (const k of Object.keys(headers)) {
-    if (k.toLowerCase() === target) return (headers as any)[k];
+    if (k.toLowerCase() === target) {
+      const value = normalizeHeaderValue((headers as any)[k]);
+      if (value !== undefined) return value;
+    }
   }
   return undefined;
 }
@@ -1359,37 +1396,63 @@ async function buildVTMetadata(
     suspiciousFeatures,
 
     // Redirect
-    redirect,
+    redirect: {
+      count: redirect?.count,
+      entropy: redirect?.entropy,
+      similarity: redirect?.similarity,
+    },
 
     // DNS
-    dns,
+    dns: {
+      ratio: dns?.ratio,
+    },
 
     // Domain
     domain: {
       registrar: domain.registrar,
-      creationDate: domain.creationDate,
-      expirationDate: domain.expirationDate,
       age: domainAgeDays,
+      validDays: domainValidDays,
     },
 
     // Network
-    network,
+    network: {
+      asOwner: network?.asOwner,
+      country: network?.country,
+    },
 
     // HTTP
-    httpInfo,
+    httpInfo: {
+      statusCode: httpInfo?.statusCode,
+      serverInfo: httpInfo?.serverInfo,
+      headers: httpInfo?.headers,
+    },
 
     // TLS
-    tlsInfo,
+    tlsInfo: {
+      issuer: tlsInfo?.issuer,
+      subject: tlsInfo?.subject,
+      validDays: tlsValidDays,
+      sanEntriesCount: tlsInfo?.sanEntriesCount,
+      sanEntriesEntropy: tlsInfo?.sanEntriesEntropy,
+      sanEntriesSimilarity: tlsInfo?.sanEntriesSimilarity,
+    },
 
     // Content
-    contentInfo,
+    contentInfo: {
+      title: contentInfo?.title,
+      favicon: contentInfo?.favicon,
+      charset: contentInfo?.charset,
+      mimeType: contentInfo?.mimeType,
+      metaTagCount: contentInfo?.metaTagCount,
+    },
 
     // External Resources
-    externalResources,
-
-    domainAge: domainAgeDays,
-    domainValidDays,
-    tlsValidDays,
+    externalResources: {
+      embeddedUrlsCount: externalResources?.embeddedUrlsCount,
+      embeddedUrlsEntropy: externalResources?.embeddedUrlsEntropy,
+      embeddedUrlsSimilarity: externalResources?.embeddedUrlsSimilarity,
+      trackers: externalResources?.trackers,
+    },
   };
 
   return metadata;
@@ -1406,19 +1469,12 @@ export async function scanUrl(
   target: string,
   context: ScanContext = {}
 ): Promise<ScanResult> {
-  const ensureScheme = (url: string, scheme: "https" | "http"): string => {
-    if (!url) return url;
-    if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) return url;
-    return `${scheme}://${url}`;
-  };
-
-  const normalizedHttps = ensureScheme(target, "https");
-  console.log(`VirusTotal URL scan for: ${normalizedHttps}`);
+  console.log(`VirusTotal URL scan for: ${target}`);
 
   try {
     let urlReport: any | null = null;
     try {
-      urlReport = await getUrlReport(normalizedHttps);
+      urlReport = await getUrlReport(target);
     } catch (e: any) {
       const message = e?.message || String(e);
       const isNotFound = message.includes("404");
@@ -1427,7 +1483,7 @@ export async function scanUrl(
           "No existing VirusTotal report — submitting to VT and waitlisting."
         );
         try {
-          await submitUrl(normalizedHttps);
+          await submitUrl(target);
         } catch (_) {
           // ignore submission failures; still waitlist the URL
         }
@@ -1450,30 +1506,8 @@ export async function scanUrl(
       return { status: "waitlist", note: "analysis not complete" };
     }
 
-    let metadata: VTURLMetadata = await buildVTMetadata(
-      normalizedHttps,
-      urlReport
-    );
+    let metadata: VTURLMetadata = await buildVTMetadata(target, urlReport);
     let flattened = finalizeOutput(metadata);
-
-    if (flattened.statusCode === null || flattened.statusCode === undefined) {
-      console.log("statusCode missing; retrying with http:// prefix fallback.");
-      const normalizedHttp = ensureScheme(target, "http");
-      try {
-        const reportHttp = await getUrlReport(normalizedHttp);
-        const attrHttp = reportHttp?.data?.attributes ?? {};
-        if (attrHttp && attrHttp.last_analysis_stats) {
-          metadata = await buildVTMetadata(normalizedHttp, reportHttp);
-          flattened = finalizeOutput(metadata);
-        } else {
-          console.log(
-            "HTTP fallback also lacks analysis stats; keeping HTTPS result."
-          );
-        }
-      } catch (err: any) {
-        console.log("HTTP fallback failed:", err?.message || String(err));
-      }
-    }
 
     return { status: "success", data: flattened };
   } catch (err: any) {
