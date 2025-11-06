@@ -44,23 +44,21 @@ export interface VTURLMetadata {
   // HTTP
   httpInfo: {
     statusCode?: number;
-    contentType?: string;
-    contentLength?: number;
     serverInfo?: string;
     headers?: Record<string, string | number | null>;
   };
 
   // TLS
   tlsInfo?: {
-    issuer: string;
-    subject: string;
-    validFrom: string;
-    validTo: string;
+    issuer?: string;
+    subject?: string;
+    validFrom?: string;
+    validTo?: string;
+    validDays?: number;
     sanEntriesCount?: number | null;
     sanEntriesEntropy?: number | null;
     sanEntriesSimilarity?: number | null;
   };
-  tlsValidDays?: number;
 
   // Content
   contentInfo: {
@@ -80,7 +78,6 @@ export interface VTURLMetadata {
     trackers?: string;
   };
 }
-
 export interface VTDomainResponse {
   data: {
     id: string;
