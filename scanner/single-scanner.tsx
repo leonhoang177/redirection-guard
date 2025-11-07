@@ -174,6 +174,13 @@ function flattenObject(
   return flat;
 }
 
+function countNullValues(record: Record<string, any>): number {
+  return Object.values(record).reduce(
+    (total, value) => total + (value === null ? 1 : 0),
+    0
+  );
+}
+
 function csvEscape(value: string | undefined): string {
   if (value === undefined || value === null) return "";
   const str = String(value);
@@ -917,7 +924,7 @@ async function buildVTMetadata(
     faviconHostMatch = favicon.includes(hostname) ? true : false;
   }
 
-  // Add charset, mimeType, metaTagCount extraction
+  // Add charset, mimeType extraction
   const contentTypeHeader = getHeaderCI(rawHeaders, "content-type");
   const mimeType = contentTypeHeader?.split(";")[0]?.trim();
   let charset: string | undefined = undefined;
@@ -926,20 +933,11 @@ async function buildVTMetadata(
     if (m) charset = m[1].trim();
   }
 
-  const rawMeta = (attr as any).html_meta;
-  let metaTagCount: number | null = null;
-  if (rawMeta && typeof rawMeta === "object") {
-    metaTagCount = Object.keys(rawMeta).length; // could be 0 or positive
-  } else if (rawMeta === undefined) {
-    metaTagCount = null; // missing entirely
-  }
-
   const contentInfo = {
     title: attr.title ?? undefined,
     faviconHostMatch,
     charset,
     mimeType,
-    metaTagCount,
   };
 
   // Votes
@@ -1326,7 +1324,6 @@ async function buildVTMetadata(
       faviconHostMatch: contentInfo?.faviconHostMatch,
       charset: contentInfo?.charset,
       mimeType: contentInfo?.mimeType,
-      metaTagCount: contentInfo?.metaTagCount,
     },
 
     // Votes
@@ -1400,7 +1397,26 @@ function finalizeOutput(outputObject: any): Record<string, any> {
   const flattenedOutput = flattenObject(output);
   const mask = loadOutputMask();
 
-  return applyOutputMask(flattenedOutput, mask);
+  const maskedOutput = applyOutputMask(flattenedOutput, mask);
+  const nullCount = countNullValues(maskedOutput);
+  const hasNullCountMask = Object.prototype.hasOwnProperty.call(
+    mask,
+    "nullCount"
+  );
+  const nullCountAlias = hasNullCountMask ? mask["nullCount"] : undefined;
+
+  if (nullCountAlias !== null) {
+    const targetKey = nullCountAlias ?? "nullCount";
+    if (
+      Object.prototype.hasOwnProperty.call(maskedOutput, targetKey) &&
+      maskedOutput[targetKey] !== nullCount
+    ) {
+      dlog(`nullCount target key collision detected for ${targetKey}`);
+    }
+    maskedOutput[targetKey] = nullCount;
+  }
+
+  return maskedOutput;
 }
 
 function validateURL(url: string): string | null {

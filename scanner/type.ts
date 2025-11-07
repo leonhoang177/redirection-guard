@@ -10,7 +10,6 @@ export interface VTURLMetadata {
     faviconHostMatch?: boolean;
     charset?: string;
     mimeType?: string;
-    metaTagCount?: number;
   };
 
   // Tools
