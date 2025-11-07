@@ -939,6 +939,19 @@ async function buildVTMetadata(
     );
   }
 
+  const xFrameOptions = headers["x-frame-options"];
+  if (typeof xFrameOptions === "string") {
+    headers["x-frame-options"] = xFrameOptions.replace(/;\s+/g, ";");
+  }
+
+  const xContentTypeOptions = headers["x-content-type-options"];
+  if (typeof xContentTypeOptions === "string") {
+    headers["x-content-type-options"] = xContentTypeOptions.replace(
+      /;\s+/g,
+      ";"
+    );
+  }
+
   const cacheControlHeader = headers["cache-control"];
   if (typeof cacheControlHeader === "string") {
     headers["cache-control"] = cacheControlHeader.replace(/,\s+/g, ";");
@@ -1138,11 +1151,13 @@ async function buildVTMetadata(
   const scValues: string[] | undefined = attr.categories
     ? Object.values(attr.categories).map((v: unknown) => String(v))
     : undefined;
+
   const servicesKeyWordsList = top3Tokens(scValues, 3);
   const servicesKeyWords =
     servicesKeyWordsList.length > 0
-      ? servicesKeyWordsList.join(",")
+      ? servicesKeyWordsList.join(";")
       : undefined;
+
   const suspiciousFeaturesList = Array.isArray(attr.tags)
     ? attr.tags.map((t: any) => String(t)).filter(Boolean)
     : attr.tags
@@ -1150,7 +1165,7 @@ async function buildVTMetadata(
     : [];
   const suspiciousFeatures =
     suspiciousFeaturesList.length > 0
-      ? suspiciousFeaturesList.join(",")
+      ? suspiciousFeaturesList.join(";")
       : undefined;
 
   // Normalize trackers: VT may return an array of objects, a single object, or nothing
