@@ -1,10 +1,10 @@
 export interface VTURLMetadata {
   // Basic
   url: string;
-  urlEntropy?: number;
+  urlEntropy: number;
   isHttps: boolean;
   hostname: string;
-  contentInfo: {
+  contentInfo?: {
     title?: string;
     favicon?: string;
     faviconHostMatch?: boolean;
@@ -14,7 +14,7 @@ export interface VTURLMetadata {
   };
 
   // Tools
-  reputation?: number;
+  reputation: number;
   maliciousVotes: number;
   suspiciousVotes: number;
   servicesKeyWords?: string;
@@ -22,7 +22,7 @@ export interface VTURLMetadata {
 
   // Redirect
   redirect?: {
-    count: number | null;
+    count?: number | null;
     entropy?: number | null;
     similarity?: number | null;
   };
@@ -36,7 +36,7 @@ export interface VTURLMetadata {
   };
 
   // Domain
-  domain: {
+  domain?: {
     registrar?: string;
     creationDate?: string;
     expirationDate?: string;
@@ -45,13 +45,13 @@ export interface VTURLMetadata {
   };
 
   // Network
-  network: {
+  network?: {
     asOwner?: string;
     country?: string;
   };
 
   // HTTP
-  httpInfo: {
+  httpInfo?: {
     statusCode?: number;
     headers?: Record<string, string | number | null>;
   };
@@ -74,7 +74,8 @@ export interface VTURLMetadata {
     embeddedUrlsCount?: number | null;
     embeddedUrlsEntropy?: number | null;
     embeddedUrlsSimilarity?: number | null;
-    trackers?: string;
+    trackers?: string[];
+    trackersCount?: number;
   };
 }
 

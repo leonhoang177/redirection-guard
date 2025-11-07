@@ -1021,11 +1021,16 @@ async function buildVTMetadata(
     const m = contentTypeHeader.match(/charset\s*=\s*([^;]+)/i);
     if (m) charset = m[1].trim();
   }
-  const htmlMeta = (attr as any).html_meta || {};
-  const metaTagCount =
-    htmlMeta && typeof htmlMeta === "object"
-      ? Object.keys(htmlMeta).length
-      : undefined;
+  const rawMeta = (attr as any).html_meta;
+  let metaTagCount: number | null = null;
+
+  if (rawMeta && typeof rawMeta === "object") {
+    metaTagCount = Object.keys(rawMeta).length; // could be 0, 1, ...
+  } else if (rawMeta === null) {
+    metaTagCount = null; // explicitly null — no metadata found
+  } else if (rawMeta === undefined) {
+    metaTagCount = null; // missing entirely — treat as unknown
+  }
 
   const contentInfo = {
     title: attr.title ?? undefined,
@@ -1175,16 +1180,15 @@ async function buildVTMetadata(
       ? suspiciousFeaturesList.join(";")
       : undefined;
 
-  // Normalize trackers: VT may return an array of objects, a single object, or nothing
-  let trackersList: string[] = [];
-  if (Array.isArray(attr.trackers)) {
-    trackersList = attr.trackers
-      .flatMap((t: any) => (t && typeof t === "object" ? Object.keys(t) : []))
-      .filter(Boolean);
-  } else if (attr.trackers && typeof attr.trackers === "object") {
-    trackersList = Object.keys(attr.trackers);
-  }
-  const trackers = trackersList.length > 0 ? trackersList.join(";") : undefined;
+  const trackersCount = Array.isArray(attr.trackers)
+    ? attr.trackers.reduce(
+        (n: any, t: any) =>
+          n + (t && typeof t === "object" ? Object.keys(t).length : 0),
+        0
+      )
+    : attr.trackers && typeof attr.trackers === "object"
+    ? Object.keys(attr.trackers).length
+    : null;
 
   // Normalize outgoing links to an array of strings
   const outgoingLinksRaw = Array.isArray(attr.outgoing_links)
@@ -1211,7 +1215,7 @@ async function buildVTMetadata(
     embeddedUrlsCount,
     embeddedUrlsEntropy,
     embeddedUrlsSimilarity,
-    trackers,
+    trackersCount,
   };
 
   const redirectHosts = redirectChain
@@ -1279,8 +1283,8 @@ async function buildVTMetadata(
   if (servingIp) {
     const ipInfo = await fetchIPInfo(servingIp);
     network = {
-      asOwner: ipInfo.asOwner,
-      country: ipInfo.country,
+      asOwner: ipInfo?.asOwner,
+      country: ipInfo?.country,
     };
   }
 
@@ -1463,7 +1467,7 @@ async function buildVTMetadata(
       embeddedUrlsCount: externalResources?.embeddedUrlsCount,
       embeddedUrlsEntropy: externalResources?.embeddedUrlsEntropy,
       embeddedUrlsSimilarity: externalResources?.embeddedUrlsSimilarity,
-      trackers: externalResources?.trackers,
+      trackersCount: externalResources?.trackersCount,
     },
   };
 

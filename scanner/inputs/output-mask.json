@@ -38,5 +38,5 @@
   "externalResourcesEmbeddedUrlsCount": "embeddedURLCount",
   "externalResourcesEmbeddedUrlsEntropy": "embeddedURLEntropy",
   "externalResourcesEmbeddedUrlsSimilarity": "embeddedURLSimilarity",
-  "externalResourcesTrackers": "embeddedTrackers"
+  "externalResourcesTrackersCount": "embeddedTrackersCount"
 }
