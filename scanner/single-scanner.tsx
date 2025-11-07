@@ -1163,11 +1163,12 @@ async function buildVTMetadata(
     ? Object.values(attr.categories).map((v: unknown) => String(v))
     : undefined;
 
-  const servicesKeyWordsList = top3Tokens(scValues, 3);
+  const servicesKeyWordsRaw = top3Tokens(scValues, 3).filter(
+    (s) => s.toLowerCase() !== "alphamountain.ai"
+  );
+
   const servicesKeyWords =
-    servicesKeyWordsList.length > 0
-      ? servicesKeyWordsList.join(";")
-      : undefined;
+    servicesKeyWordsRaw.length > 0 ? servicesKeyWordsRaw.join(";") : undefined;
 
   const suspiciousFeaturesList = Array.isArray(attr.tags)
     ? attr.tags.map((t: any) => String(t)).filter(Boolean)
