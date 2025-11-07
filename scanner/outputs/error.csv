@@ -9,3 +9,7 @@ order,url,label,error
 ,https://apple.com,,Cannot read properties of undefined (reading 'reduce')
 ,https://facebook.com,,attr?.trackers?.reduce is not a function
 ,https://facebook.com,,attr?.trackers?.reduce is not a function
+,https://facebook.com,,"GET /urls/aHR0cHM6Ly9mYWNlYm9vay5jb20 -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
+,https://facebook.com,,"GET /urls/aHR0cHM6Ly9mYWNlYm9vay5jb20 -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
+,https://facebook.com,,"GET /urls/aHR0cHM6Ly9mYWNlYm9vay5jb20 -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
+,https://lou-lab.com,,"GET /urls/aHR0cHM6Ly9sb3UtbGFiLmNvbQ -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"

@@ -885,7 +885,6 @@ async function buildVTMetadata(
   const urlObj = new URL(targetUrl);
   const url = targetUrl;
   const urlEntropy = normalizedEntropy(url);
-  console.log("targetUrl: ", targetUrl);
   const isHttps = url.trim().startsWith("https://");
   const hostname = urlObj.hostname;
 
@@ -1180,15 +1179,13 @@ async function buildVTMetadata(
       ? suspiciousFeaturesList.join(";")
       : undefined;
 
-  const trackersCount = Array.isArray(attr.trackers)
-    ? attr.trackers.reduce(
-        (n: any, t: any) =>
-          n + (t && typeof t === "object" ? Object.keys(t).length : 0),
-        0
-      )
-    : attr.trackers && typeof attr.trackers === "object"
-    ? Object.keys(attr.trackers).length
-    : null;
+  const trackers = attr?.trackers;
+  const trackersCount =
+    trackers && typeof trackers === "object" && !Array.isArray(trackers)
+      ? Object.keys(trackers).length
+      : Array.isArray(trackers)
+      ? trackers.filter((t) => typeof t === "string" && t.trim() !== "").length
+      : null;
 
   // Normalize outgoing links to an array of strings
   const outgoingLinksRaw = Array.isArray(attr.outgoing_links)

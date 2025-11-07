@@ -74,7 +74,7 @@ export interface VTURLMetadata {
     embeddedUrlsCount?: number | null;
     embeddedUrlsEntropy?: number | null;
     embeddedUrlsSimilarity?: number | null;
-    trackers?: string[];
+    trackers?: object;
     trackersCount?: number;
   };
 }
