@@ -2,6 +2,7 @@ export interface VTURLMetadata {
   // Basic
   url: string;
   urlEntropy?: number;
+  isHttps: boolean;
   hostname: string;
 
   // Tools

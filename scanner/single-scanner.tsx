@@ -878,8 +878,11 @@ async function buildVTMetadata(
 ): Promise<VTURLMetadata> {
   const urlObj = new URL(targetUrl);
   const url = targetUrl;
+  const urlEntropy = normalizedEntropy(url);
+  console.log("targetUrl: ", targetUrl);
+  const isHttps =
+    typeof url === "string" && url.trim().toLowerCase().startsWith("https://");
   const hostname = urlObj.hostname;
-  const path = urlObj.pathname + urlObj.search + urlObj.hash;
 
   const attr = vtUrlPayload?.data?.attributes ?? {};
   dlog("attr keys:", Object.keys(attr));
@@ -989,7 +992,6 @@ async function buildVTMetadata(
 
   // Entropy features
   // urlEntropy: normalized entropy of the PROVIDED URL only
-  const urlEntropy = normalizedEntropy(url);
 
   // redirectEntropy: average of individual URL entropies across the chain
   const redirectCount = redirectChainRaw === null ? null : redirectChain.length;
@@ -1373,7 +1375,7 @@ async function buildVTMetadata(
     }
   }
 
-  const metadata: any = {
+  const outputObject: any = {
     // Basic
     url,
     urlEntropy,
@@ -1450,34 +1452,43 @@ async function buildVTMetadata(
     },
   };
 
-  return metadata;
+  return outputObject;
 }
 
-function finalizeOutput(metadata: any): Record<string, any> {
-  const output = deepMarkAbsent(metadata);
+function finalizeOutput(outputObject: any): Record<string, any> {
+  const output = deepMarkAbsent(outputObject);
   const flattenedOutput = flattenObject(output);
   const mask = loadOutputMask();
 
   return applyOutputMask(flattenedOutput, mask);
 }
 
+function validateURL(url: string): string | null {
+  if (typeof url !== "string") return null;
+
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed.toLowerCase();
+  } else return null;
+}
+
 export async function scanUrl(
   target: string,
   context: ScanContext = {}
 ): Promise<ScanResult> {
-  const ensureScheme = (url: string, scheme: "https" | "http"): string => {
-    if (!url) return url;
-    if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) return url;
-    return `${scheme}://${url}`;
-  };
-
-  const normalizedHttps = ensureScheme(target, "https");
-  console.log(`VirusTotal URL scan for: ${normalizedHttps}`);
+  const url = validateURL(target);
+  if (url === null) {
+    return {
+      status: "error",
+      error: "Invalid URL. Please provide an URL starts with 'http' or 'https'",
+    };
+  }
+  console.log(`VirusTotal URL scan for: ${url}`);
 
   try {
     let urlReport: any | null = null;
     try {
-      urlReport = await getUrlReport(normalizedHttps);
+      urlReport = await getUrlReport(url);
     } catch (e: any) {
       const message = e?.message || String(e);
       const isNotFound = message.includes("404");
@@ -1486,7 +1497,7 @@ export async function scanUrl(
           "No existing VirusTotal report — submitting to VT and waitlisting."
         );
         try {
-          await submitUrl(normalizedHttps);
+          await submitUrl(url);
         } catch (_) {
           // ignore submission failures; still waitlist the URL
         }
@@ -1509,8 +1520,8 @@ export async function scanUrl(
       return { status: "waitlist", note: "analysis not complete" };
     }
 
-    let metadata: any = await buildVTMetadata(normalizedHttps, urlReport);
-    let flattened = finalizeOutput(metadata);
+    let outputObject: any = await buildVTMetadata(url, urlReport);
+    let flattened = finalizeOutput(outputObject);
 
     return { status: "success", data: flattened };
   } catch (err: any) {
