@@ -296,16 +296,14 @@ async function fetchDomainInfo(hostname: string) {
     const attr = domainResp?.data?.attributes ?? {};
     const registrar = attr.registrar;
     const creationDate = formatUtcDateTime(attr.creation_date);
-    const domainAgeDays =
-      typeof attr.creation_date === "number"
-        ? Math.max(
-            0,
-            Math.floor(
-              (Date.now() - attr.creation_date * 1000) / (1000 * 60 * 60 * 24)
-            )
-          )
-        : undefined;
     const expirationDate = formatUtcDateTime(attr.expiration_date);
+
+    const age = creationDate ? calculateDaysSince(creationDate) : undefined;
+    const validDays =
+      creationDate && expirationDate
+        ? computeDaysBetween(creationDate, expirationDate)
+        : undefined;
+
     const lastHttpsCert = (attr as any)?.last_https_certificate;
     // Capture the first A record (if present) to use as a network fallback
     let firstA: string | undefined;
@@ -319,8 +317,8 @@ async function fetchDomainInfo(hostname: string) {
       registrar,
       creationDate,
       expirationDate,
-      domainAge: domainAgeDays,
-      age: domainAgeDays,
+      age,
+      validDays,
       _lastHttpsCert: lastHttpsCert,
       _firstA: firstA,
     } as any;
@@ -332,8 +330,9 @@ async function fetchDomainInfo(hostname: string) {
       expirationDate: ABSENT,
       domainAge: ABSENT,
       age: ABSENT,
-      _lastHttpsCert: undefined,
-      _firstA: undefined,
+      validDays: ABSENT,
+      _lastHttpsCert: ABSENT,
+      _firstA: ABSENT,
     } as any;
   }
 }
@@ -851,7 +850,6 @@ function computeDaysBetween(
 
 async function fetchPassiveDnsForDomain(hostname: string) {
   try {
-    // Prefer the documented /resolutions resource; limit to a sane page
     const resp = await vtGet(`/domains/${hostname}/resolutions?limit=40`);
     const rows = Array.isArray(resp?.data) ? resp.data : [];
     let first: number | undefined;
@@ -869,10 +867,7 @@ async function fetchPassiveDnsForDomain(hostname: string) {
       firstSeen: formatUtcDateTime(first),
     } as VTURLMetadata["dns"];
   } catch (e) {
-    dlog(
-      "passive DNS (domain) fetch failed:",
-      (e as any)?.message || String(e)
-    );
+    dlog("dns fetch failed:", (e as any)?.message || String(e));
     return undefined;
   }
 }
@@ -1375,21 +1370,6 @@ async function buildVTMetadata(
     }
   }
 
-  const domainAgeDays =
-    domain?.creationDate && domain.creationDate !== ABSENT
-      ? calculateDaysSince(domain.creationDate)
-      : typeof (domain as any)?.domainAge === "number"
-      ? (domain as any).domainAge
-      : undefined;
-
-  const domainValidDays =
-    domain?.creationDate &&
-    domain.creationDate !== ABSENT &&
-    domain?.expirationDate &&
-    domain.expirationDate !== ABSENT
-      ? computeDaysBetween(domain?.creationDate, domain?.expirationDate)
-      : undefined;
-
   const tlsValidDays = computeDaysBetween(tlsInfo?.validFrom, tlsInfo?.validTo);
 
   const metadata: VTURLMetadata = {
@@ -1420,8 +1400,8 @@ async function buildVTMetadata(
     // Domain
     domain: {
       registrar: domain.registrar,
-      age: domainAgeDays,
-      validDays: domainValidDays,
+      age: domain.age,
+      validDays: domain.validDays,
     },
 
     // Network
