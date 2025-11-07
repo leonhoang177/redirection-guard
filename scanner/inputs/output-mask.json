@@ -2,6 +2,7 @@
   "url": "url",
   "urlEntropy": "urlEntropy",
   "hostname": "hostname",
+  "isHttps": "isHttps",
   "contentInfoTitle": "title",
   "contentInfoFavicon": "favicon",
   "contentInfoCharset": "charset",

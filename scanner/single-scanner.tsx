@@ -880,8 +880,7 @@ async function buildVTMetadata(
   const url = targetUrl;
   const urlEntropy = normalizedEntropy(url);
   console.log("targetUrl: ", targetUrl);
-  const isHttps =
-    typeof url === "string" && url.trim().toLowerCase().startsWith("https://");
+  const isHttps = url.trim().startsWith("https://");
   const hostname = urlObj.hostname;
 
   const attr = vtUrlPayload?.data?.attributes ?? {};
@@ -1380,6 +1379,7 @@ async function buildVTMetadata(
     url,
     urlEntropy,
     hostname,
+    isHttps,
     contentInfo: {
       title: contentInfo?.title,
       favicon: contentInfo?.favicon,
