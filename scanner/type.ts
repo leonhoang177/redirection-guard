@@ -44,9 +44,6 @@ export interface VTURLMetadata {
   // HTTP
   httpInfo: {
     statusCode?: number;
-    contentType?: string;
-    contentLength?: number;
-    serverInfo?: string;
     headers?: Record<string, string | number | null>;
   };
 

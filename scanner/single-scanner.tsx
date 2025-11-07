@@ -889,6 +889,7 @@ async function buildVTMetadata(
   const cspValues = getHeaderValuesCI(rawHeaders, "content-security-policy");
 
   const selectedMaybe: Record<string, string | undefined> = {
+    server: getHeaderCI(rawHeaders, "server"),
     "content-security-policy":
       Array.isArray(cspValues) && cspValues.length > 0
         ? cspValues[0]
@@ -899,7 +900,6 @@ async function buildVTMetadata(
     ),
     "x-frame-options": getHeaderCI(rawHeaders, "x-frame-options"),
     "x-content-type-options": getHeaderCI(rawHeaders, "x-content-type-options"),
-    server: getHeaderCI(rawHeaders, "server"),
     "cache-control": getHeaderCI(rawHeaders, "cache-control"),
   };
   // Build headers map allowing string | number | null (temporary)
@@ -926,15 +926,11 @@ async function buildVTMetadata(
   }
   delete tempHeaders["content-security-policy"]; // remove raw CSP value
 
-  // Rebuild headers with CSP count first
   const headers: Record<string, string | number | null> = {
     "content-security-policy-count": contentSecurityPolicyCount,
     ...tempHeaders,
   };
-  const cacheControlHeader = headers["cache-control"];
-  if (typeof cacheControlHeader === "string") {
-    headers["cache-control"] = cacheControlHeader.replace(/,\s+/g, ",");
-  }
+
   const strictTransportHeader = headers["strict-transport-security"];
   if (typeof strictTransportHeader === "string") {
     headers["strict-transport-security"] = strictTransportHeader.replace(
@@ -943,11 +939,14 @@ async function buildVTMetadata(
     );
   }
 
+  const cacheControlHeader = headers["cache-control"];
+  if (typeof cacheControlHeader === "string") {
+    headers["cache-control"] = cacheControlHeader.replace(/,\s+/g, ";");
+  }
+
   const httpInfo = {
     headers,
     statusCode: attr.last_http_response_code ?? undefined,
-    contentLength: attr.last_http_response_content_length ?? undefined,
-    serverInfo: (headers["server"] as string | null) || undefined,
   };
 
   // Redirect info (define early so contentInfo can use it)
@@ -1372,7 +1371,7 @@ async function buildVTMetadata(
 
   const tlsValidDays = computeDaysBetween(tlsInfo?.validFrom, tlsInfo?.validTo);
 
-  const metadata: VTURLMetadata = {
+  const metadata: any = {
     // Basic
     url,
     urlEntropy,
@@ -1399,16 +1398,30 @@ async function buildVTMetadata(
 
     // Domain
     domain: {
-      registrar: domain.registrar,
-      age: domain.age,
-      validDays: domain.validDays,
+      registrar: domain?.registrar,
+      age: domain?.age,
+      validDays: domain?.validDays,
     },
 
     // Network
-    network,
+    network: {
+      asOwner: network?.asOwner,
+      country: network?.country,
+    },
 
     // HTTP
-    httpInfo,
+    httpInfo: {
+      statusCode: httpInfo?.statusCode,
+    },
+
+    header: {
+      httpServer: httpInfo?.headers["server"],
+      contentSecurityPolicyCount: contentSecurityPolicyCount,
+      strictTransportSecurity: httpInfo?.headers["strict-transport-security"],
+      xFrameOptions: httpInfo?.headers["x-frame-options"],
+      xContentTypeOptions: httpInfo?.headers["x-content-type-options"],
+      cacheControl: httpInfo?.headers["cache-control"],
+    },
 
     // TLS
     tlsInfo,
@@ -1425,7 +1438,7 @@ async function buildVTMetadata(
   return metadata;
 }
 
-function finalizeOutput(metadata: VTURLMetadata): Record<string, any> {
+function finalizeOutput(metadata: any): Record<string, any> {
   const output = deepMarkAbsent(metadata);
   const flattenedOutput = flattenObject(output);
   const mask = loadOutputMask();
@@ -1481,10 +1494,7 @@ export async function scanUrl(
       return { status: "waitlist", note: "analysis not complete" };
     }
 
-    let metadata: VTURLMetadata = await buildVTMetadata(
-      normalizedHttps,
-      urlReport
-    );
+    let metadata: any = await buildVTMetadata(normalizedHttps, urlReport);
     let flattened = finalizeOutput(metadata);
 
     return { status: "success", data: flattened };
