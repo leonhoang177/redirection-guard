@@ -1020,15 +1020,13 @@ async function buildVTMetadata(
     const m = contentTypeHeader.match(/charset\s*=\s*([^;]+)/i);
     if (m) charset = m[1].trim();
   }
+
   const rawMeta = (attr as any).html_meta;
   let metaTagCount: number | null = null;
-
   if (rawMeta && typeof rawMeta === "object") {
-    metaTagCount = Object.keys(rawMeta).length; // could be 0, 1, ...
-  } else if (rawMeta === null) {
-    metaTagCount = null; // explicitly null — no metadata found
+    metaTagCount = Object.keys(rawMeta).length; // could be 0 or positive
   } else if (rawMeta === undefined) {
-    metaTagCount = null; // missing entirely — treat as unknown
+    metaTagCount = null; // missing entirely
   }
 
   const contentInfo = {
