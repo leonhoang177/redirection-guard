@@ -4,7 +4,7 @@
   "hostname": "hostname",
   "isHttps": "isHttps",
   "contentInfoTitle": "title",
-  "contentInfoFavicon": "favicon",
+  "contentInfoFaviconHostMatch": "faviconHostMatch",
   "contentInfoCharset": "charset",
   "contentInfoMimeType": "MIMEType",
   "contentInfoMetaTagCount": "metaTagCount",

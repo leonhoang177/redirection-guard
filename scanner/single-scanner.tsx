@@ -974,6 +974,7 @@ async function buildVTMetadata(
 
   // Favicon URL: VT sometimes stores a URL, otherwise try Link header, else heuristic /favicon.ico
   let favicon: string | undefined = attr.favicon ?? undefined;
+
   if (!favicon) {
     const linkHeader = (headers?.["link"] || headers?.["Link"]) as
       | string
@@ -981,6 +982,7 @@ async function buildVTMetadata(
     const iconFromLink = extractIconFromLinkHeader(linkHeader, url);
     if (iconFromLink) favicon = iconFromLink;
   }
+
   if (!favicon) {
     try {
       // Heuristic only; does not fetch, just fills a reasonable default
@@ -989,10 +991,11 @@ async function buildVTMetadata(
     } catch {}
   }
 
-  // Entropy features
-  // urlEntropy: normalized entropy of the PROVIDED URL only
+  let faviconHostMatch = undefined;
+  if (!!favicon) {
+    faviconHostMatch = favicon.includes(hostname) ? true : false;
+  }
 
-  // redirectEntropy: average of individual URL entropies across the chain
   const redirectCount = redirectChainRaw === null ? null : redirectChain.length;
   const redirectEntropy =
     redirectChainRaw === null ? null : avgEntropy(redirectChain);
@@ -1020,7 +1023,8 @@ async function buildVTMetadata(
 
   const contentInfo = {
     title: attr.title ?? undefined,
-    favicon,
+    //favicon,
+    faviconHostMatch,
     charset,
     mimeType,
     metaTagCount,
@@ -1382,7 +1386,8 @@ async function buildVTMetadata(
     isHttps,
     contentInfo: {
       title: contentInfo?.title,
-      favicon: contentInfo?.favicon,
+      //favicon: contentInfo?.favicon,
+      faviconHostMatch: contentInfo?.faviconHostMatch,
       charset: contentInfo?.charset,
       mimeType: contentInfo?.mimeType,
       metaTagCount: contentInfo?.metaTagCount,

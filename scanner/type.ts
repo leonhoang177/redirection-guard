@@ -4,6 +4,14 @@ export interface VTURLMetadata {
   urlEntropy?: number;
   isHttps: boolean;
   hostname: string;
+  contentInfo: {
+    title?: string;
+    favicon?: string;
+    faviconHostMatch?: boolean;
+    charset?: string;
+    mimeType?: string;
+    metaTagCount?: number;
+  };
 
   // Tools
   reputation?: number;
@@ -57,15 +65,6 @@ export interface VTURLMetadata {
     sanEntriesCount?: number | null;
     sanEntriesEntropy?: number | null;
     sanEntriesSimilarity?: number | null;
-  };
-
-  // Content
-  contentInfo: {
-    title?: string;
-    favicon?: string;
-    charset?: string;
-    mimeType?: string;
-    metaTagCount?: number;
   };
 
   // External Resources

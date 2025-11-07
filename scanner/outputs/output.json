@@ -4,7 +4,7 @@
   "hostname": "microsoft.com",
   "isHttps": true,
   "title": "Microsoft – AI, Cloud, Productivity, Computing, Gaming & Apps",
-  "favicon": "https://microsoft.com/favicon.ico",
+  "faviconHostMatch": true,
   "charset": "utf-8",
   "MIMEType": "text/html",
   "metaTagCount": 26,
