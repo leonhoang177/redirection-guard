@@ -49,15 +49,14 @@ export interface VTURLMetadata {
 
   // TLS
   tlsInfo?: {
-    issuer: string;
     subject: string;
     validFrom: string;
     validTo: string;
+    validDays?: number;
     sanEntriesCount?: number | null;
     sanEntriesEntropy?: number | null;
     sanEntriesSimilarity?: number | null;
   };
-  tlsValidDays?: number;
 
   // Content
   contentInfo: {

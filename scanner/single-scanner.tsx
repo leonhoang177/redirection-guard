@@ -962,7 +962,7 @@ async function buildVTMetadata(
     statusCode: attr.last_http_response_code ?? undefined,
   };
 
-  // Redirect info (define early so contentInfo can use it)
+  // Redirect info
   const redirectChainRaw = Array.isArray(attr.redirection_chain)
     ? attr.redirection_chain
     : attr.redirection_chain == null
@@ -1039,10 +1039,7 @@ async function buildVTMetadata(
   // 1) Directly from URL attributes (some keys carry inline attributes, others only an id)
   dlog("try direct last_https_certificate:", !!attr.last_https_certificate);
   if (attr.last_https_certificate) {
-    if (
-      attr.last_https_certificate.issuer ||
-      attr.last_https_certificate.subject
-    ) {
+    if (attr.last_https_certificate.subject) {
       certAttributes = attr.last_https_certificate;
     } else {
       const deref = await fetchCertificateById(attr.last_https_certificate);
@@ -1281,7 +1278,7 @@ async function buildVTMetadata(
   try {
     const domainLastCert = (domain as any)?._lastHttpsCert;
     if (!certAttributes && domainLastCert) {
-      if (domainLastCert.issuer || domainLastCert.subject) {
+      if (domainLastCert.subject) {
         certAttributes = domainLastCert;
       } else {
         const deref = await fetchCertificateById(domainLastCert);
@@ -1293,26 +1290,15 @@ async function buildVTMetadata(
   // Build tlsInfo (full certificate view) from certAttributes if available
   let tlsInfo: VTURLMetadata["tlsInfo"] | undefined = undefined;
   if (certAttributes) {
-    const issuerObj =
-      (certAttributes as any).issuer ?? (certAttributes as any).issuer_dn;
     const subjectObj =
       (certAttributes as any).subject ?? (certAttributes as any).subject_dn;
 
-    const issuerCN =
-      parseCNFromDN(issuerObj) ||
-      (certAttributes as any).issuer_cn ||
-      undefined;
     const subjectCN =
       parseCNFromDN(subjectObj) ||
       (certAttributes as any).subject_cn ||
       undefined;
 
     // Prefer DN strings if available, else fall back to CNs, else JSON
-    const issuerStr =
-      typeof issuerObj === "string"
-        ? issuerObj
-        : issuerCN ?? (issuerObj ? JSON.stringify(issuerObj) : undefined);
-
     const subjectStr =
       typeof subjectObj === "string"
         ? subjectObj
@@ -1366,31 +1352,39 @@ async function buildVTMetadata(
     const validFrom = formatUtcDateTime(nbRaw);
     const validTo = formatUtcDateTime(naRaw);
 
-    if (issuerStr && subjectStr && validFrom && validTo) {
+    let validDays;
+    if (validFrom ?? validTo) {
+      validDays = computeDaysBetween(validFrom, validTo);
+    }
+
+    if (subjectStr && validFrom && validTo) {
       tlsInfo = {
-        issuer: issuerStr,
         subject: subjectStr,
         validFrom,
         validTo,
+        validDays,
         sanEntriesCount,
         sanEntriesEntropy,
         sanEntriesSimilarity,
       };
       dlog("tlsInfo:", tlsInfo);
     } else {
-      dlog(
-        "tlsInfo not fully populated (missing one of issuer/subject/validity)"
-      );
+      dlog("tlsInfo not fully populated (missing one of subject/validity)");
     }
   }
-
-  const tlsValidDays = computeDaysBetween(tlsInfo?.validFrom, tlsInfo?.validTo);
 
   const metadata: any = {
     // Basic
     url,
     urlEntropy,
     hostname,
+    contentInfo: {
+      title: contentInfo?.title,
+      favicon: contentInfo?.favicon,
+      charset: contentInfo?.charset,
+      mimeType: contentInfo?.mimeType,
+      metaTagCount: contentInfo?.metaTagCount,
+    },
 
     // Votes
     reputation: attr?.reputation ?? null,
@@ -1439,15 +1433,16 @@ async function buildVTMetadata(
     },
 
     // TLS
-    tlsInfo,
-
-    // Content
-    contentInfo,
+    tlsInfo: {
+      subject: tlsInfo?.subject,
+      validDays: tlsInfo?.validDays,
+      sanEntriesCount: tlsInfo?.sanEntriesCount,
+      sanEntriesEntropy: tlsInfo?.sanEntriesEntropy,
+      sanEntriesSimilarity: tlsInfo?.sanEntriesSimilarity,
+    },
 
     // External Resources
     externalResources,
-
-    tlsValidDays,
   };
 
   return metadata;
