@@ -40,6 +40,92 @@ const ERROR_HEADERS = ["order", "url", "label", "error"];
 
 const ABSENT = null;
 
+type OutputMask = Record<string, string | null>;
+
+const DEFAULT_OUTPUT_MASK_PATH = "./inputs/output-mask.json";
+const OUTPUT_MASK_ENV = (process.env.OUTPUT_MASK_PATH || "").trim();
+const OUTPUT_MASK_PATH = path.resolve(
+  OUTPUT_MASK_ENV || DEFAULT_OUTPUT_MASK_PATH
+);
+let cachedOutputMask: OutputMask | null = null;
+
+function loadOutputMask(): OutputMask {
+  if (cachedOutputMask !== null) return cachedOutputMask;
+
+  try {
+    if (!fs.existsSync(OUTPUT_MASK_PATH)) {
+      dlog("Output mask not found; using default field names.");
+      cachedOutputMask = {};
+      return cachedOutputMask;
+    }
+
+    const raw = fs.readFileSync(OUTPUT_MASK_PATH, "utf-8");
+    if (!raw.trim()) {
+      cachedOutputMask = {};
+      return cachedOutputMask;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Output mask must be a JSON object with key mappings.");
+    }
+
+    const normalized: OutputMask = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, any>)) {
+      if (value === null) {
+        normalized[key] = null;
+      } else if (typeof value === "string") {
+        const trimmed = value.trim();
+        normalized[key] = trimmed.length > 0 ? trimmed : null;
+      } else {
+        normalized[key] = String(value);
+      }
+    }
+
+    cachedOutputMask = normalized;
+    dlog("Loaded output mask with entries:", Object.keys(normalized).length);
+    return cachedOutputMask;
+  } catch (err: any) {
+    console.warn(
+      `Failed to load output mask from ${OUTPUT_MASK_PATH}:`,
+      err?.message || err
+    );
+    cachedOutputMask = {};
+    return cachedOutputMask;
+  }
+}
+
+function applyOutputMask(
+  flattened: Record<string, any>,
+  mask: OutputMask
+): Record<string, any> {
+  if (!mask || Object.keys(mask).length === 0) return flattened;
+
+  const masked: Record<string, any> = {};
+  const collisions: string[] = [];
+
+  for (const [key, value] of Object.entries(flattened)) {
+    const hasEntry = Object.prototype.hasOwnProperty.call(mask, key);
+    const alias = hasEntry ? mask[key] : undefined;
+    if (alias === null) continue; // explicit opt-out
+
+    const targetKey = alias ?? key;
+    if (
+      Object.prototype.hasOwnProperty.call(masked, targetKey) &&
+      targetKey !== key
+    ) {
+      collisions.push(`${key}->${targetKey}`);
+    }
+    masked[targetKey] = value;
+  }
+
+  if (collisions.length > 0) {
+    dlog("Output mask collisions detected:", collisions.join(", "));
+  }
+
+  return masked;
+}
+
 function deepMarkAbsent(value: any): any {
   if (value === undefined || value === null) return ABSENT;
   if (Array.isArray(value)) return value.map((v) => deepMarkAbsent(v));
@@ -769,14 +855,12 @@ async function fetchPassiveDnsForDomain(hostname: string) {
     const resp = await vtGet(`/domains/${hostname}/resolutions?limit=40`);
     const rows = Array.isArray(resp?.data) ? resp.data : [];
     let first: number | undefined;
-    let last: number | undefined;
 
     for (const r of rows) {
       const a = r?.attributes || {};
       const when = a.date || a.last_resolved || a.first_seen || a.last_seen;
       if (typeof when === "number") {
         if (first === undefined || when < first) first = when;
-        if (last === undefined || when > last) last = when;
       }
     }
 
@@ -789,32 +873,6 @@ async function fetchPassiveDnsForDomain(hostname: string) {
       "passive DNS (domain) fetch failed:",
       (e as any)?.message || String(e)
     );
-    return undefined;
-  }
-}
-
-async function fetchPassiveDnsForIP(ip: string) {
-  try {
-    const resp = await vtGet(`/ip_addresses/${ip}/resolutions?limit=40`);
-    const rows = Array.isArray(resp?.data) ? resp.data : [];
-    let first: number | undefined;
-    let last: number | undefined;
-
-    for (const r of rows) {
-      const a = r?.attributes || {};
-      const when = a.date || a.last_resolved || a.first_seen || a.last_seen;
-      if (typeof when === "number") {
-        if (first === undefined || when < first) first = when;
-        if (last === undefined || when > last) last = when;
-      }
-    }
-
-    return {
-      count: rows.length,
-      firstSeen: formatUtcDateTime(first),
-    } as VTURLMetadata["dns"];
-  } catch (e) {
-    dlog("passive DNS (ip) fetch failed:", (e as any)?.message || String(e));
     return undefined;
   }
 }
@@ -1161,23 +1219,12 @@ async function buildVTMetadata(
     }
   } catch {}
 
-  // Optionally complement with IP-side resolutions if we have the serving IP
-  try {
-    const ipForDns = attr.last_serving_ip_address;
-    if (!dns && ipForDns) {
-      const pdIp = await fetchPassiveDnsForIP(ipForDns);
-      if (pdIp && (pdIp.firstSeen || pdIp.count)) {
-        dns = pdIp;
-      }
-    }
-  } catch {}
-
   if (dns && dns?.firstSeen && dns.firstSeen !== ABSENT) {
     dns.age = calculateDaysSince(dns.firstSeen);
   }
 
   if (dns && dns.age && dns.count && dns.count !== 0) {
-    dns.ratio = dns.age / dns.count;
+    dns.ratio = dns.age / Math.max(dns.count, 1);
   }
 
   // Decide serving IP using multiple fallbacks
@@ -1359,17 +1406,22 @@ async function buildVTMetadata(
     suspiciousFeatures,
 
     // Redirect
-    redirect,
+    redirect: {
+      count: redirect?.count,
+      entropy: redirect?.entropy,
+      similarity: redirect?.similarity,
+    },
 
     // DNS
-    dns,
+    dns: {
+      ratio: dns?.ratio,
+    },
 
     // Domain
     domain: {
       registrar: domain.registrar,
-      creationDate: domain.creationDate,
-      expirationDate: domain.expirationDate,
       age: domainAgeDays,
+      validDays: domainValidDays,
     },
 
     // Network
@@ -1387,8 +1439,6 @@ async function buildVTMetadata(
     // External Resources
     externalResources,
 
-    domainAge: domainAgeDays,
-    domainValidDays,
     tlsValidDays,
   };
 
@@ -1398,8 +1448,9 @@ async function buildVTMetadata(
 function finalizeOutput(metadata: VTURLMetadata): Record<string, any> {
   const output = deepMarkAbsent(metadata);
   const flattenedOutput = flattenObject(output);
+  const mask = loadOutputMask();
 
-  return flattenedOutput;
+  return applyOutputMask(flattenedOutput, mask);
 }
 
 export async function scanUrl(
@@ -1455,25 +1506,6 @@ export async function scanUrl(
       urlReport
     );
     let flattened = finalizeOutput(metadata);
-
-    if (flattened.statusCode === null || flattened.statusCode === undefined) {
-      console.log("statusCode missing; retrying with http:// prefix fallback.");
-      const normalizedHttp = ensureScheme(target, "http");
-      try {
-        const reportHttp = await getUrlReport(normalizedHttp);
-        const attrHttp = reportHttp?.data?.attributes ?? {};
-        if (attrHttp && attrHttp.last_analysis_stats) {
-          metadata = await buildVTMetadata(normalizedHttp, reportHttp);
-          flattened = finalizeOutput(metadata);
-        } else {
-          console.log(
-            "HTTP fallback also lacks analysis stats; keeping HTTPS result."
-          );
-        }
-      } catch (err: any) {
-        console.log("HTTP fallback failed:", err?.message || String(err));
-      }
-    }
 
     return { status: "success", data: flattened };
   } catch (err: any) {

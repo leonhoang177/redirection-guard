@@ -56,6 +56,16 @@ Click it to open the popup and start monitoring redirects in real time.
 
 ---
 
+### 🛠 Customize Scanner Output Field Names
+
+The single and batch scanners read an optional mask file at `inputs/output-mask.json`.
+Populate this JSON object with `originalKey: "Your Custom Label"` pairs to rename
+fields in the generated `outputs/output.json` and `outputs/output.jsonl` data. Set a
+value to `null` if you want to omit a field entirely. An example mask is provided to
+help you get started; edit it to match your preferred field names.
+
+---
+
 ## 📝 Notes
 
 - Ensure you’ve built the extension before loading it in Chrome.
