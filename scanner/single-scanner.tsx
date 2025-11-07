@@ -1023,7 +1023,6 @@ async function buildVTMetadata(
 
   const contentInfo = {
     title: attr.title ?? undefined,
-    //favicon,
     faviconHostMatch,
     charset,
     mimeType,
@@ -1292,7 +1291,7 @@ async function buildVTMetadata(
     }
   } catch {}
 
-  // Build tlsInfo (full certificate view) from certAttributes if available
+  // Build tlsInfo from certAttributes if available
   let tlsInfo: VTURLMetadata["tlsInfo"] | undefined = undefined;
   if (certAttributes) {
     const subjectObj =
@@ -1308,6 +1307,9 @@ async function buildVTMetadata(
       typeof subjectObj === "string"
         ? subjectObj
         : subjectCN ?? (subjectObj ? JSON.stringify(subjectObj) : undefined);
+
+    const subjectMatch =
+      subjectStr && subjectStr.includes(hostname) ? true : false;
 
     const nbRaw =
       (certAttributes as any).validity?.not_before ??
@@ -1365,6 +1367,7 @@ async function buildVTMetadata(
     if (subjectStr && validFrom && validTo) {
       tlsInfo = {
         subject: subjectStr,
+        subjectMatch,
         validFrom,
         validTo,
         validDays,
@@ -1386,7 +1389,6 @@ async function buildVTMetadata(
     isHttps,
     contentInfo: {
       title: contentInfo?.title,
-      //favicon: contentInfo?.favicon,
       faviconHostMatch: contentInfo?.faviconHostMatch,
       charset: contentInfo?.charset,
       mimeType: contentInfo?.mimeType,
@@ -1441,7 +1443,7 @@ async function buildVTMetadata(
 
     // TLS
     tlsInfo: {
-      subject: tlsInfo?.subject,
+      subjectMatch: tlsInfo?.subjectMatch,
       validDays: tlsInfo?.validDays,
       sanEntriesCount: tlsInfo?.sanEntriesCount,
       sanEntriesEntropy: tlsInfo?.sanEntriesEntropy,
