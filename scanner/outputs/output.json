@@ -22,7 +22,7 @@
   "networkAsOwner": "MICROSOFT-CORP-MSN-AS-BLOCK",
   "networkCountry": "US",
   "statusCode": 200,
-  "headerServerName": null,
+  "serverName": null,
   "contentSecurityPolicyCount": null,
   "strictTransportSecurity": "max-age=31536000;includeSubDomains",
   "xFrameOptions": null,

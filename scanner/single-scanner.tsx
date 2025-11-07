@@ -1424,7 +1424,7 @@ async function buildVTMetadata(
     },
 
     header: {
-      serverName: httpInfo?.headers["server"],
+      httpServer: httpInfo?.headers["server"],
       contentSecurityPolicyCount: contentSecurityPolicyCount,
       strictTransportSecurity: httpInfo?.headers["strict-transport-security"],
       xFrameOptions: httpInfo?.headers["x-frame-options"],
