@@ -22,7 +22,7 @@
   "networkAsOwner": "networkAsOwner",
   "networkCountry": "networkCountry",
   "httpInfoStatusCode": "statusCode",
-  "headerHttpServer": "httpServer",
+  "headerHttpServer": "serverName",
   "headerContentSecurityPolicyCount": "contentSecurityPolicyCount",
   "headerStrictTransportSecurity": "strictTransportSecurity",
   "headerXFrameOptions": "xFrameOptions",

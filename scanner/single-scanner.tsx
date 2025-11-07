@@ -1174,7 +1174,7 @@ async function buildVTMetadata(
   } else if (attr.trackers && typeof attr.trackers === "object") {
     trackersList = Object.keys(attr.trackers);
   }
-  const trackers = trackersList.length > 0 ? trackersList.join(",") : undefined;
+  const trackers = trackersList.length > 0 ? trackersList.join(";") : undefined;
 
   // Normalize outgoing links to an array of strings
   const outgoingLinksRaw = Array.isArray(attr.outgoing_links)
@@ -1424,7 +1424,7 @@ async function buildVTMetadata(
     },
 
     header: {
-      httpServer: httpInfo?.headers["server"],
+      serverName: httpInfo?.headers["server"],
       contentSecurityPolicyCount: contentSecurityPolicyCount,
       strictTransportSecurity: httpInfo?.headers["strict-transport-security"],
       xFrameOptions: httpInfo?.headers["x-frame-options"],
@@ -1442,7 +1442,12 @@ async function buildVTMetadata(
     },
 
     // External Resources
-    externalResources,
+    externalResources: {
+      embeddedUrlsCount: externalResources?.embeddedUrlsCount,
+      embeddedUrlsEntropy: externalResources?.embeddedUrlsEntropy,
+      embeddedUrlsSimilarity: externalResources?.embeddedUrlsSimilarity,
+      trackers: externalResources?.trackers,
+    },
   };
 
   return metadata;
