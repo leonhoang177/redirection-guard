@@ -17,7 +17,6 @@
   "redirectEntropy": "redirectEntropy",
   "redirectSimilarity": "redirectSimilarity",
   "dnsRatio": "dnsRatio",
-  "domainRegistrar": "domainRegistrar",
   "domainAge": "domainAge",
   "domainValidDays": "domainValidDays",
   "networkAsOwner": "networkAsOwner",

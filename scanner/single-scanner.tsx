@@ -300,7 +300,6 @@ async function fetchDomainInfo(hostname: string) {
     const base = getRegistrableDomain(hostname) || hostname;
     const domainResp: VTDomainResponse = await vtGet(`/domains/${base}`);
     const attr = domainResp?.data?.attributes ?? {};
-    const registrar = attr.registrar;
     const creationDate = formatUtcDateTime(attr.creation_date);
     const expirationDate = formatUtcDateTime(attr.expiration_date);
 
@@ -320,7 +319,6 @@ async function fetchDomainInfo(hostname: string) {
     }
     return {
       _queriedBase: base,
-      registrar,
       creationDate,
       expirationDate,
       age,
@@ -331,7 +329,6 @@ async function fetchDomainInfo(hostname: string) {
   } catch {
     return {
       _queriedBase: getRegistrableDomain(hostname) || hostname,
-      registrar: ABSENT,
       creationDate: ABSENT,
       expirationDate: ABSENT,
       domainAge: ABSENT,
@@ -479,81 +476,6 @@ function extractIconFromLinkHeader(
       } catch {
         return urlMatch[1];
       }
-    }
-  }
-  return undefined;
-}
-
-// ---- WHOIS city parsing helpers ----
-function looksLikeStreetAddress(s: string): boolean {
-  const str = s.toLowerCase();
-  if (
-    /(street|st\.?|road|rd\.?|avenue|ave\.?|blvd|boulevard|suite|ste\.?|floor|fl\.?|building|bldg)/i.test(
-      str
-    )
-  ) {
-    return true;
-  }
-  const digits = (str.match(/\d+/g) || []).join("");
-  if (digits.length >= 3) return true;
-  return false;
-}
-
-function cleanupCityToken(raw: string): string | undefined {
-  if (!raw) return undefined;
-  let s = raw.trim();
-  // Remove surrounding quotes
-  s = s.replace(/^"|"$/g, "");
-  // Strip leading postal codes like "22177 Hamburg", "DE-22177 Hamburg", "W1A 1HQ London"
-  const postalRe = /^(?:[A-Z]{1,3}[- ]?)?\d{3,6}\s+(.+)$/i;
-  const m1 = s.match(postalRe);
-  if (m1 && m1[1]) s = m1[1].trim();
-  // Remove trailing country names/codes
-  s = s
-    .replace(
-      /,?\s*(united states|usa|germany|de|france|fr|united kingdom|uk|italy|it|spain|es)$/i,
-      ""
-    )
-    .trim();
-  if (!s || looksLikeStreetAddress(s)) return undefined;
-  const letters = (s.match(/[a-z]/gi) || []).length;
-  const digits = (s.match(/\d/g) || []).length;
-  if (letters < 3 || digits > 2) return undefined;
-  return s;
-}
-
-function extractCityFromWhoisText(whoisText?: string): string | undefined {
-  if (!whoisText) return undefined;
-  const lines = whoisText
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  // 1) Explicit keys
-  const keys = [/^city\s*:/i, /^town\s*:/i, /^location\s*:/i];
-  for (const ln of lines) {
-    for (const re of keys) {
-      if (re.test(ln)) {
-        const val = ln.split(":").slice(1).join(":").trim();
-        const cleaned = cleanupCityToken(val);
-        if (cleaned) return cleaned;
-      }
-    }
-  }
-  // 2) Address line heuristic
-  const addrLine = lines.find((l) => /^address\s*:/i.test(l));
-  if (addrLine) {
-    const v = addrLine.split(":").slice(1).join(":").trim();
-    const parts = v
-      .split(/,\s*/)
-      .map((x) => x.trim())
-      .filter(Boolean);
-    const candidates = parts.map(cleanupCityToken).filter(Boolean) as string[];
-    if (candidates.length) {
-      candidates.sort(
-        (a, b) =>
-          a.replace(/[^a-z]/gi, "").length - b.replace(/[^a-z]/gi, "").length
-      );
-      return candidates[candidates.length - 1];
     }
   }
   return undefined;
@@ -1243,7 +1165,8 @@ async function buildVTMetadata(
   }
 
   if (dns && dns.age && dns.count && dns.count !== 0) {
-    dns.ratio = dns.age / Math.max(dns.count, 1);
+    const ratio = dns.age / Math.max(dns.count, 1);
+    dns.ratio = Number(ratio.toFixed(4));
   }
 
   // Decide serving IP using multiple fallbacks
@@ -1427,7 +1350,6 @@ async function buildVTMetadata(
 
     // Domain
     domain: {
-      registrar: domain?.registrar,
       age: domain?.age,
       validDays: domain?.validDays,
     },

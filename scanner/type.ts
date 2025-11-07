@@ -37,7 +37,6 @@ export interface VTURLMetadata {
 
   // Domain
   domain?: {
-    registrar?: string;
     creationDate?: string;
     expirationDate?: string;
     age?: number;
