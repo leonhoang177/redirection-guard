@@ -560,15 +560,15 @@ function extractCityFromWhoisText(whoisText?: string): string | undefined {
 }
 
 // Normalized Shannon entropy (bits per character), independent of length
-function normalizedEntropy(s: string): number {
-  if (!s || !s.length) return 0;
+function normalizedEntropy(source: string): number {
+  if (!source || source.length <= 0) return -1;
   const freq: Record<string, number> = {};
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
     freq[ch] = (freq[ch] || 0) + 1;
   }
   let H = 0;
-  const n = s.length;
+  const n = source.length;
   for (const k in freq) {
     const p = freq[k] / n;
     H -= p * Math.log2(p);
@@ -576,9 +576,21 @@ function normalizedEntropy(s: string): number {
   return +H.toFixed(4); // bits/char
 }
 
-// Simple redirect similarity metric: average normalized Levenshtein similarity between all URLs
-function avgSimilarity(urls: string[]): number {
-  if (!Array.isArray(urls) || urls.length < 2) return -1;
+function avgEntropy(stringArray: string[]): number {
+  if (!stringArray || !Array.isArray(stringArray) || stringArray.length <= 0)
+    return -1;
+  if (stringArray.length === 1) return normalizedEntropy(stringArray[0]);
+  const avg =
+    stringArray.reduce(
+      (sum, v) => sum + normalizedEntropy(String(v).toLowerCase()),
+      0
+    ) / stringArray.length;
+  return Number(avg.toFixed(4));
+}
+
+function avgSimilarity(stringArray: string[]): number {
+  if (!stringArray || !Array.isArray(stringArray) || stringArray.length < 2)
+    return -1;
   function levenshteinSim(a: string, b: string): number {
     const m = a.length,
       n = b.length;
@@ -601,23 +613,13 @@ function avgSimilarity(urls: string[]): number {
   }
   let sum = 0,
     pairs = 0;
-  for (let i = 0; i < urls.length; i++) {
-    for (let j = i + 1; j < urls.length; j++) {
-      sum += levenshteinSim(urls[i], urls[j]);
+  for (let i = 0; i < stringArray.length; i++) {
+    for (let j = i + 1; j < stringArray.length; j++) {
+      sum += levenshteinSim(stringArray[i], stringArray[j]);
       pairs++;
     }
   }
   return Number((sum / pairs).toFixed(4));
-}
-
-function avgEntropy(values: string[]): number {
-  if (!Array.isArray(values) || values.length === 0) return -1;
-  const avg =
-    values.reduce(
-      (sum, v) => sum + normalizedEntropy(String(v).toLowerCase()),
-      0
-    ) / values.length;
-  return Number(avg.toFixed(4));
 }
 
 // Compute top-N tokens from an array of phrases, ignoring common stopwords
@@ -969,14 +971,6 @@ async function buildVTMetadata(
     statusCode: attr.last_http_response_code ?? undefined,
   };
 
-  // Redirect info
-  const redirectChainRaw = Array.isArray(attr.redirection_chain)
-    ? attr.redirection_chain
-    : attr.redirection_chain == null
-    ? null
-    : [];
-  const redirectChain: string[] = redirectChainRaw ?? [];
-
   // Favicon URL: VT sometimes stores a URL, otherwise try Link header, else heuristic /favicon.ico
   let favicon: string | undefined = attr.favicon ?? undefined;
 
@@ -1001,17 +995,6 @@ async function buildVTMetadata(
     faviconHostMatch = favicon.includes(hostname) ? true : false;
   }
 
-  const redirectCount = redirectChainRaw === null ? null : redirectChain.length;
-  const redirectEntropy =
-    redirectChainRaw === null ? null : avgEntropy(redirectChain);
-  const redirectSimilarityValue =
-    redirectChainRaw === null ? null : avgSimilarity(redirectChain);
-  const redirect = {
-    count: redirectCount,
-    entropy: redirectEntropy,
-    similarity: redirectSimilarityValue,
-  };
-
   // Add charset, mimeType, metaTagCount extraction
   const contentTypeHeader = getHeaderCI(rawHeaders, "content-type");
   const mimeType = contentTypeHeader?.split(";")[0]?.trim();
@@ -1035,6 +1018,31 @@ async function buildVTMetadata(
     charset,
     mimeType,
     metaTagCount,
+  };
+
+  // Votes
+  const lastStats = attr?.last_analysis_stats ?? null;
+  const maliciousCount = lastStats?.malicious ?? null;
+  const suspiciousCount = lastStats?.suspicious ?? null;
+
+  // Redirect
+  const redirectChainRaw = attr.redirection_chain;
+  let redirectChain: string[] = [];
+  let redirectCount: number | null = null;
+  if (Array.isArray(redirectChainRaw)) {
+    redirectChain = redirectChainRaw;
+    redirectCount = redirectChainRaw.length; // 0 or positive
+  } else if (redirectChainRaw === null || redirectChainRaw === undefined) {
+    redirectCount = null; // no redirect data
+  }
+
+  const redirectEntropy = avgEntropy(redirectChain);
+  const redirectSimilarityValue = avgSimilarity(redirectChain);
+
+  const redirect = {
+    count: redirectCount,
+    entropy: redirectEntropy,
+    similarity: redirectSimilarityValue,
   };
 
   // Fetch domain early so baseDomain is available for certificate fallbacks and network
@@ -1150,11 +1158,6 @@ async function buildVTMetadata(
     !!certAttributes,
     certAttributes && Object.keys(certAttributes)
   );
-
-  // Votes
-  const lastStats = attr?.last_analysis_stats ?? null;
-  const maliciousCount = lastStats?.malicious ?? null;
-  const suspiciousCount = lastStats?.suspicious ?? null;
 
   // Threat info
   const scValues: string[] | undefined = attr.categories
