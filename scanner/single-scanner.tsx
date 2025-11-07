@@ -144,6 +144,12 @@ function capitalizeKeySegment(segment: string): string {
   return segment[0].toUpperCase() + segment.slice(1);
 }
 
+function isSubjectOverlap(hostname: string, subjectStr: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\*\./, "");
+  const subj = subjectStr.toLowerCase().replace(/^\*\./, "");
+  return host.endsWith(subj) || subj.endsWith(host);
+}
+
 function isPlainObject(value: any): value is Record<string, any> {
   if (value === null || typeof value !== "object") return false;
   const proto = Object.getPrototypeOf(value);
@@ -1309,7 +1315,9 @@ async function buildVTMetadata(
         : subjectCN ?? (subjectObj ? JSON.stringify(subjectObj) : undefined);
 
     const subjectMatch =
-      subjectStr && subjectStr.includes(hostname) ? true : false;
+      hostname && subjectStr
+        ? isSubjectOverlap(hostname, subjectStr)
+        : undefined;
 
     const nbRaw =
       (certAttributes as any).validity?.not_before ??

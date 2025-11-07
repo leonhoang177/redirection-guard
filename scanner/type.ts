@@ -58,10 +58,10 @@ export interface VTURLMetadata {
 
   // TLS
   tlsInfo?: {
-    subject: string;
-    subjectMatch: boolean;
-    validFrom: string;
-    validTo: string;
+    subject?: string;
+    subjectMatch?: boolean;
+    validFrom?: string;
+    validTo?: string;
     validDays?: number;
     sanEntriesCount?: number | null;
     sanEntriesEntropy?: number | null;
