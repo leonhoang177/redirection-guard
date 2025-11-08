@@ -36,10 +36,13 @@ export type ScanResult =
   | { status: "error"; error: string };
 
 export const WAITLIST_CSV_PATH = "./outputs/waitlist.csv";
-const WAITLIST_HEADERS = ["order", "url", "label", "note"];
 export const ERROR_CSV_PATH = "./outputs/error.csv";
-const ERROR_HEADERS = ["order", "url", "label", "error"];
+export const DEFAULT_INSTRUCTION_PATH = "./inputs/instruction.txt";
+const PROMPT_OUTPUT_PATH = "./outputs/prompt.txt";
+const FIELDS_OUTPUT_PATH = "./outputs/fields.json";
 
+const WAITLIST_HEADERS = ["order", "url", "label", "note"];
+const ERROR_HEADERS = ["order", "url", "label", "error"];
 const ABSENT = null;
 
 type OutputMask = Record<string, string | null>;
@@ -183,6 +186,41 @@ function countNullValues(record: Record<string, any>): number {
   );
 }
 
+export function readInstructionText(): string {
+  const envInstruction = (process.env.INSTRUCTION_TEXT || "").trim();
+  if (envInstruction.length > 0) return envInstruction;
+
+  try {
+    return fs.readFileSync(DEFAULT_INSTRUCTION_PATH, "utf-8").trim();
+  } catch {
+    return "";
+  }
+}
+
+export function formatInstructionPrompt(
+  flattened: Record<string, any>,
+  instruction?: string
+): string | null {
+  if (!instruction || instruction.trim().length === 0) return null;
+
+  const entries = Object.entries(flattened);
+  const parts = entries.map(([key, value]) => {
+    if (value === null) return `${key}=null`;
+    if (typeof value === "string") return `${key}=${value}`;
+    if (typeof value === "number" || typeof value === "boolean")
+      return `${key}=${value}`;
+    return `${key}=${JSON.stringify(value)}`;
+  });
+
+  const body = parts.join(" | ");
+  return `${instruction}::DATA: ${body} CLASSIFICATION:`;
+}
+
+function loadInstructionText(): string | null {
+  const text = readInstructionText();
+  return text.length > 0 ? text : null;
+}
+
 function csvEscape(value: string | undefined): string {
   if (value === undefined || value === null) return "";
   const str = String(value);
@@ -261,7 +299,9 @@ function parseApiKeys(): string[] {
 const API_KEYS = parseApiKeys();
 
 if (API_KEYS.length === 0) {
-  console.error("Missing VT_API_KEY(S). Provide VT_API_KEY or VT_API_KEYS env vars.");
+  console.error(
+    "Missing VT_API_KEY(S). Provide VT_API_KEY or VT_API_KEYS env vars."
+  );
   process.exit(1);
 }
 
@@ -292,14 +332,21 @@ function tryRotateApiKey(reason: string): boolean {
 }
 
 function isQuotaOrForbiddenStatus(status: number, body: string): boolean {
-  if (status === 403 || status === 429) return true;
+  if (status === 429) return true;
   const normalized = body.toLowerCase();
-  return (
-    normalized.includes("quota") ||
-    normalized.includes("rate limit") ||
-    normalized.includes("forbidden") ||
-    normalized.includes("too many requests")
-  );
+  const quotaIndicators = [
+    "quota",
+    "rate limit",
+    "too many requests",
+    "exceeded",
+  ];
+  if (quotaIndicators.some((token) => normalized.includes(token))) {
+    return true;
+  }
+  if (status === 403) {
+    return normalized.includes("quota");
+  }
+  return false;
 }
 
 // Encode plain URL → VT base64url (no padding)
@@ -331,9 +378,7 @@ async function performVTRequest(
 
     const text = await res.text();
     if (isQuotaOrForbiddenStatus(res.status, text)) {
-      const rotated = tryRotateApiKey(
-        `${method} ${path} -> ${res.status}`
-      );
+      const rotated = tryRotateApiKey(`${method} ${path} -> ${res.status}`);
       if (rotated) continue;
       throw new Error(
         `VirusTotal quota exhausted across all API keys. Last response ${method} ${path} -> ${res.status}: ${text}`
@@ -1589,13 +1634,25 @@ async function run() {
   }
 
   const flattenedOutput = result.data;
-
-  fs.writeFileSync(
-    "./outputs/output.json",
-    JSON.stringify(flattenedOutput, null, 2),
-    "utf-8"
+  const instruction = loadInstructionText();
+  const promptOutput = formatInstructionPrompt(
+    flattenedOutput,
+    instruction || ""
   );
-  console.log("Output written to output.json");
+
+  if (promptOutput !== null) {
+    fs.mkdirSync(path.dirname(PROMPT_OUTPUT_PATH), { recursive: true });
+    fs.writeFileSync(PROMPT_OUTPUT_PATH, promptOutput, "utf-8");
+    fs.writeFileSync(
+      FIELDS_OUTPUT_PATH,
+      JSON.stringify(flattenedOutput, null, 2),
+      "utf-8"
+    );
+    console.log(
+      `Prompt output written to ${PROMPT_OUTPUT_PATH} and ${FIELDS_OUTPUT_PATH}`
+    );
+    return;
+  }
 }
 
 const isMainModule =

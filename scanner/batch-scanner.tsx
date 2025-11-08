@@ -6,11 +6,13 @@ import {
   WAITLIST_CSV_PATH,
   ERROR_CSV_PATH,
   appendToWaitlist,
+  formatInstructionPrompt,
+  readInstructionText,
+  DEFAULT_INSTRUCTION_PATH,
 } from "./single-scanner";
 
 const INPUT_PATH = "./inputs/input.csv";
 const OUTPUT_DIR = "./outputs";
-const INSTRUCTION_PATH = "./inputs/instruction.txt";
 
 type InputRecord = {
   order: string;
@@ -43,25 +45,6 @@ function parseDelimitedLine(line: string): string[] {
   return cells;
 }
 
-function formatInputText(
-  flattened: Record<string, any>,
-  instruction?: string
-): string | null {
-  if (!instruction || instruction.trim().length === 0) return null;
-
-  const entries = Object.entries(flattened);
-  const parts = entries.map(([key, value]) => {
-    if (value === null) return `${key}=null`;
-    if (typeof value === "string") return `${key}=${value}`;
-    if (typeof value === "number" || typeof value === "boolean")
-      return `${key}=${value}`;
-    return `${key}=${JSON.stringify(value)}`;
-  });
-
-  const body = parts.join(" | ");
-  return `${instruction}::DATA: ${body} CLASSIFICATION:`;
-}
-
 function sanitizeForFilename(value: string): string {
   const safe = value.replace(/[^a-zA-Z0-9-_]/g, "_");
   return safe.length > 0 ? safe : "unknown";
@@ -69,7 +52,7 @@ function sanitizeForFilename(value: string): string {
 
 function buildOutputPath(firstOrder?: string, lastOrder?: string): string {
   if (!firstOrder || !lastOrder) {
-    return `${OUTPUT_DIR}/output.jsonl`;
+    return `${OUTPUT_DIR}/unknown-unknown.jsonl`;
   }
   const first = sanitizeForFilename(firstOrder);
   const last = sanitizeForFilename(lastOrder);
@@ -201,8 +184,7 @@ function isQuotaOrForbiddenError(message: string): boolean {
     normalized.includes("forbidden") ||
     normalized.includes("rate limit") ||
     normalized.includes("too many requests") ||
-    normalized.includes("429") ||
-    normalized.includes("403")
+    normalized.includes("429")
   );
 }
 
@@ -225,7 +207,7 @@ async function processRecords(
       });
 
       if (result.status === "success") {
-        const inputText = formatInputText(result.data, instruction);
+        const inputText = formatInstructionPrompt(result.data, instruction);
         if (inputText === null) {
           console.log(
             `Skipped ID ${record.order}: no valid instruction provided.`
@@ -276,12 +258,7 @@ async function processRecords(
 }
 
 async function runBatch() {
-  let instruction = "";
-  try {
-    instruction = fs.readFileSync(INSTRUCTION_PATH, "utf-8").trim();
-  } catch {
-    instruction = "";
-  }
+  const instruction = readInstructionText();
 
   let currentRecords: InputRecord[];
   try {

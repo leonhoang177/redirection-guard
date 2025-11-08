@@ -1,12 +1,6 @@
 order,url,label,note
-7,http://119.185.191.23:41520/i,phish
-8,http://201.16.194.227:2550/TmpFTP/EXTCONS/1/0021/28072020084117/info.zip,phish
-9,http://200.59.88.204:36673/i,phish
-10,http://115.49.29.188:38517/bin.sh,phish
-11,http://196.251.84.155/hiddenbin/boatnet.m68k,phish
-12,http://193.242.149.32:38302/i,phish
-13,http://177.70.102.232:8090/TmpFTP/01/Recep%C3%A7%C3%A3o/2019-10-14/info.zip,phish
-14,http://77.73.131.224:5554/WalletSorterDLL.dll,phish
-15,http://119.109.161.248:34258/bin.sh,phish
 16,http://103.20.213.34:8080/Uploads/Uploads/Aryacorp%20Mumbai/Fixtures%202008/MV.ALAKNANDA_NOB_140208_003/Charter%20Parties/info.zip,phish
 17,http://196.251.69.129/fdgsfg,phish
+18,https://toxcx.cn,legit
+19,http://93.117.8.26:2573/i,phish
+20,https://hssw360.com,legit
