@@ -47,7 +47,7 @@ const ABSENT = null;
 
 type OutputMask = Record<string, string | null>;
 
-const DEFAULT_OUTPUT_MASK_PATH = "./inputs/output-mask.json";
+const DEFAULT_OUTPUT_MASK_PATH = "./inputs/field-name.json";
 const OUTPUT_MASK_ENV = (process.env.OUTPUT_MASK_PATH || "").trim();
 const OUTPUT_MASK_PATH = path.resolve(
   OUTPUT_MASK_ENV || DEFAULT_OUTPUT_MASK_PATH
