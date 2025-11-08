@@ -7,7 +7,7 @@ import {
   ERROR_CSV_PATH,
 } from "./single-scanner";
 
-const INPUT_PATH = "./inputs/remain.csv";
+const INPUT_PATH = "./inputs/mixed_urls_3.csv";
 const OUTPUT_PATH = "./outputs/output.jsonl";
 const INSTRUCTION_PATH = "./inputs/instruction.txt";
 
@@ -39,7 +39,9 @@ function parseDelimitedLine(line: string): string[] {
 function formatInputText(
   flattened: Record<string, any>,
   instruction?: string
-): string {
+): string | null {
+  if (!instruction || instruction.trim().length === 0) return null;
+
   const entries = Object.entries(flattened);
   const parts = entries.map(([key, value]) => {
     if (value === null) return `${key}=null`;
@@ -48,11 +50,9 @@ function formatInputText(
       return `${key}=${value}`;
     return `${key}=${JSON.stringify(value)}`;
   });
+
   const body = parts.join(" | ");
-  if (instruction && instruction.length > 0) {
-    return `${instruction}::DATA: ${body} CLASSIFICATION:`;
-  }
-  return `DATA: ${body}`;
+  return `${instruction}::DATA: ${body} CLASSIFICATION:`;
 }
 
 async function runBatch() {
@@ -126,10 +126,20 @@ async function runBatch() {
         rawUrl: url,
       });
       if (result.status === "success") {
+        const inputText = formatInputText(result.data, instruction);
+        if (inputText === null) {
+          console.log(`Skipped ${url}: no valid instruction provided.`);
+          continue;
+        }
+
+        // ✅ Convert into Gemini SFT format
         const record = {
-          input_text: formatInputText(result.data, instruction),
-          output_text: label ?? "",
+          contents: [
+            { role: "user", parts: [{ text: inputText }] },
+            { role: "model", parts: [{ text: label ?? "" }] },
+          ],
         };
+
         fs.appendFileSync(OUTPUT_PATH, `${JSON.stringify(record)}\n`, "utf-8");
         console.log(`Saved result for ${url}`);
       } else if (result.status === "waitlist") {
