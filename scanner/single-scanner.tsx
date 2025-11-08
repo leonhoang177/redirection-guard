@@ -37,7 +37,7 @@ export type ScanResult =
 
 export const WAITLIST_CSV_PATH = "./outputs/waitlist.csv";
 export const ERROR_CSV_PATH = "./outputs/error.csv";
-//export const DEFAULT_INSTRUCTION_PATH = "./inputs/instruction.txt";
+
 const PROMPT_OUTPUT_PATH = "./outputs/prompt.txt";
 const FIELDS_OUTPUT_PATH = "./outputs/fields.json";
 
@@ -50,59 +50,81 @@ type OutputMask = Record<string, string | null>;
 const INSTRUCTION =
   "INSTRUCT: Cyber Security Analyst. Classify: 'phish' or 'legit'.::EXP: null=failed to read. isHttps=URL secure. entropy=avg randomness. similarity=avg text match. dnsRatio=age/count. faviconMatch=favicon URL match host. tlsSubjectMatch=TLS subject match host.::HINTS: Higher reputation: more % legit. maliciousVotes>0: 100% phish. domainValidDays<366: 75% phish. isHttps=false: 75% phish. suspiciousVotes>0: 75% phish. nullCount>=10: 75% phish";
 
-/*const DEFAULT_OUTPUT_MASK_PATH = "./inputs/field-name.json";
-const OUTPUT_MASK_ENV = (process.env.OUTPUT_MASK_PATH || "").trim();
-const OUTPUT_MASK_PATH = path.resolve(
-  OUTPUT_MASK_ENV || DEFAULT_OUTPUT_MASK_PATH
-);
-let cachedOutputMask: OutputMask | null = null;
+const CUSTOMED_FIELDS_NAME = {
+  url: "url",
+  urlEntropy: "urlEntropy",
+  hostname: "hostname",
+  isHttps: "isHttps",
+  contentInfoTitle: "title",
+  contentInfoFaviconHostMatch: "faviconMatch",
+  contentInfoCharset: "charset",
+  contentInfoMimeType: "MIMEType",
+  contentInfoMetaTagCount: "metaTagCount",
+  reputation: "reputation",
+  maliciousVotes: "maliciousVotes",
+  suspiciousVotes: "suspiciousVotes",
+  servicesKeyWords: "services",
+  suspiciousFeatures: "features",
+  redirectCount: "redirectCount",
+  redirectEntropy: "redirectEntropy",
+  redirectSimilarity: "redirectSimilarity",
+  dnsRatio: "dnsRatio",
+  domainAge: "domainAge",
+  domainValidDays: "domainValidDays",
+  networkAsOwner: "networkAsOwner",
+  networkCountry: "networkCountry",
+  httpInfoStatusCode: "statusCode",
+  headerHttpServer: "serverName",
+  headerContentSecurityPolicyCount: "contentSecurityPolicyCount",
+  headerStrictTransportSecurity: "strictTransportSecurity",
+  headerXFrameOptions: "xFrameOptions",
+  headerXContentTypeOptions: "xContentTypeOptions",
+  headerCacheControl: "cacheControl",
+  tlsInfoSubjectMatch: "tlsSubjectMatch",
+  tlsInfoValidDays: "tlsValidDays",
+  tlsInfoSanEntriesCount: "tlsSANCount",
+  tlsInfoSanEntriesEntropy: "tlsSANEntropy",
+  tlsInfoSanEntriesSimilarity: "tlsSANSimilarity",
+  externalResourcesEmbeddedUrlsCount: "embeddedURLCount",
+  externalResourcesEmbeddedUrlsEntropy: "embeddedURLEntropy",
+  externalResourcesEmbeddedUrlsSimilarity: "embeddedURLSimilarity",
+  externalResourcesTrackersCount: "embeddedTrackersCount",
+  nullCount: "nullCount",
+};
 
-function loadOutputMask(): OutputMask {
-  if (cachedOutputMask !== null) return cachedOutputMask;
-
-  try {
-    if (!fs.existsSync(OUTPUT_MASK_PATH)) {
-      dlog("Output mask not found; using default field names.");
-      cachedOutputMask = {};
-      return cachedOutputMask;
-    }
-
-    const raw = fs.readFileSync(OUTPUT_MASK_PATH, "utf-8");
-    if (!raw.trim()) {
-      cachedOutputMask = {};
-      return cachedOutputMask;
-    }
-
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error("Output mask must be a JSON object with key mappings.");
-    }
-
-    const normalized: OutputMask = {};
-    for (const [key, value] of Object.entries(parsed as Record<string, any>)) {
-      if (value === null) {
-        normalized[key] = null;
-      } else if (typeof value === "string") {
-        const trimmed = value.trim();
-        normalized[key] = trimmed.length > 0 ? trimmed : null;
-      } else {
-        normalized[key] = String(value);
-      }
-    }
-
-    cachedOutputMask = normalized;
-    dlog("Loaded output mask with entries:", Object.keys(normalized).length);
-    return cachedOutputMask;
-  } catch (err: any) {
-    console.warn(
-      `Failed to load output mask from ${OUTPUT_MASK_PATH}:`,
-      err?.message || err
-    );
-    cachedOutputMask = {};
-    return cachedOutputMask;
-  }
-}
-  */
+const USELESS_WORDS = new Set([
+  "and",
+  "or",
+  "a",
+  "an",
+  "the",
+  "of",
+  "for",
+  "to",
+  "in",
+  "on",
+  "at",
+  "by",
+  "with",
+  "without",
+  "from",
+  "as",
+  "is",
+  "are",
+  "be",
+  "this",
+  "that",
+  "these",
+  "those",
+  "it",
+  "its",
+  "other",
+  "others",
+  "another",
+  "&",
+  "/",
+  "-",
+]);
 
 function applyOutputMask(
   flattened: Record<string, any>,
@@ -190,17 +212,6 @@ function countNullValues(record: Record<string, any>): number {
   );
 }
 
-/*export function readInstructionText(): string {
-  const envInstruction = (process.env.INSTRUCTION_TEXT || "").trim();
-  if (envInstruction.length > 0) return envInstruction;
-
-  try {
-    return fs.readFileSync(DEFAULT_INSTRUCTION_PATH, "utf-8").trim();
-  } catch {
-    return "";
-  }
-}*/
-
 export function formatInstructionPrompt(
   flattened: Record<string, any>,
   instruction?: string
@@ -219,11 +230,6 @@ export function formatInstructionPrompt(
   const body = parts.join(" | ");
   return `${instruction}::DATA: ${body} CLASSIFICATION:`;
 }
-
-/*function loadInstructionText(): string | null {
-  const text = readInstructionText();
-  return text.length > 0 ? text : null;
-}*/
 
 function csvEscape(value: string | undefined): string {
   if (value === undefined || value === null) return "";
@@ -679,39 +685,6 @@ function avgSimilarity(stringArray: string[]): number {
 // Compute top-N tokens from an array of phrases, ignoring common stopwords
 function top3Tokens(phrases: string[] | undefined, n: number = 3): string[] {
   if (!Array.isArray(phrases) || phrases.length === 0) return [];
-  const STOP = new Set([
-    "and",
-    "or",
-    "a",
-    "an",
-    "the",
-    "of",
-    "for",
-    "to",
-    "in",
-    "on",
-    "at",
-    "by",
-    "with",
-    "without",
-    "from",
-    "as",
-    "is",
-    "are",
-    "be",
-    "this",
-    "that",
-    "these",
-    "those",
-    "it",
-    "its",
-    "other",
-    "others",
-    "another",
-    "&",
-    "/",
-    "-",
-  ]);
   const freq: Record<string, number> = {};
   for (const p of phrases) {
     const parts = String(p)
@@ -721,7 +694,7 @@ function top3Tokens(phrases: string[] | undefined, n: number = 3): string[] {
       )
       .filter(Boolean);
     for (const t of parts) {
-      if (STOP.has(t)) continue;
+      if (USELESS_WORDS.has(t)) continue;
       freq[t] = (freq[t] || 0) + 1;
     }
   }
@@ -1517,53 +1490,11 @@ async function buildVTMetadata(
   return outputObject;
 }
 
-const outputMask = {
-  url: "url",
-  urlEntropy: "urlEntropy",
-  hostname: "hostname",
-  isHttps: "isHttps",
-  contentInfoTitle: "title",
-  contentInfoFaviconHostMatch: "faviconMatch",
-  contentInfoCharset: "charset",
-  contentInfoMimeType: "MIMEType",
-  contentInfoMetaTagCount: "metaTagCount",
-  reputation: "reputation",
-  maliciousVotes: "maliciousVotes",
-  suspiciousVotes: "suspiciousVotes",
-  servicesKeyWords: "services",
-  suspiciousFeatures: "features",
-  redirectCount: "redirectCount",
-  redirectEntropy: "redirectEntropy",
-  redirectSimilarity: "redirectSimilarity",
-  dnsRatio: "dnsRatio",
-  domainAge: "domainAge",
-  domainValidDays: "domainValidDays",
-  networkAsOwner: "networkAsOwner",
-  networkCountry: "networkCountry",
-  httpInfoStatusCode: "statusCode",
-  headerHttpServer: "serverName",
-  headerContentSecurityPolicyCount: "contentSecurityPolicyCount",
-  headerStrictTransportSecurity: "strictTransportSecurity",
-  headerXFrameOptions: "xFrameOptions",
-  headerXContentTypeOptions: "xContentTypeOptions",
-  headerCacheControl: "cacheControl",
-  tlsInfoSubjectMatch: "tlsSubjectMatch",
-  tlsInfoValidDays: "tlsValidDays",
-  tlsInfoSanEntriesCount: "tlsSANCount",
-  tlsInfoSanEntriesEntropy: "tlsSANEntropy",
-  tlsInfoSanEntriesSimilarity: "tlsSANSimilarity",
-  externalResourcesEmbeddedUrlsCount: "embeddedURLCount",
-  externalResourcesEmbeddedUrlsEntropy: "embeddedURLEntropy",
-  externalResourcesEmbeddedUrlsSimilarity: "embeddedURLSimilarity",
-  externalResourcesTrackersCount: "embeddedTrackersCount",
-  nullCount: "nullCount",
-};
-
 function finalizeOutput(outputObject: any): Record<string, any> {
   const output = deepMarkAbsent(outputObject);
   const flattenedOutput = flattenObject(output);
   //const mask = loadOutputMask();
-  const mask = outputMask;
+  const mask = CUSTOMED_FIELDS_NAME;
 
   const maskedOutput = applyOutputMask(flattenedOutput, mask);
   const nullCount = countNullValues(maskedOutput);

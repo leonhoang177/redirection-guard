@@ -7,8 +7,6 @@ import {
   ERROR_CSV_PATH,
   appendToWaitlist,
   formatInstructionPrompt,
-  readInstructionText,
-  DEFAULT_INSTRUCTION_PATH,
 } from "./single-scanner";
 
 const INPUT_PATH = "./inputs/input.csv";
@@ -258,8 +256,6 @@ async function processRecords(
 }
 
 async function runBatch() {
-  const instruction = readInstructionText();
-
   let currentRecords: InputRecord[];
   try {
     currentRecords = readInputRecords(INPUT_PATH);
