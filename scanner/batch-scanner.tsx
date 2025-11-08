@@ -7,7 +7,7 @@ import {
   ERROR_CSV_PATH,
 } from "./single-scanner";
 
-const INPUT_PATH = "./inputs/mixed_urls_4.csv";
+const INPUT_PATH = "./inputs/mixed_urls_3.csv";
 const OUTPUT_PATH = "./outputs/output.jsonl";
 const INSTRUCTION_PATH = "./inputs/instruction.txt";
 
@@ -50,7 +50,7 @@ function formatInputText(
   });
   const body = parts.join(" | ");
   if (instruction && instruction.length > 0) {
-    return `INSTRUCTION: ${instruction} | DATA: ${body}`;
+    return `${instruction}::DATA: ${body} CLASSIFICATION:`;
   }
   return `DATA: ${body}`;
 }
