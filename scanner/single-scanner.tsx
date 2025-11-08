@@ -704,40 +704,6 @@ function top3Tokens(phrases: string[] | undefined, n: number = 3): string[] {
     .map(([tok]) => tok);
 }
 
-// Heuristic parser for response-time style headers (ms)
-function parseDurationToMs(raw: string): number | undefined {
-  if (!raw) return undefined;
-  const s = String(raw).trim();
-  // cases: "123ms", "0.123s", "123", "0.123"
-  const msMatch = s.match(/^([0-9]*\.?[0-9]+)\s*ms$/i);
-  if (msMatch) return Math.round(parseFloat(msMatch[1]));
-  const sMatch = s.match(/^([0-9]*\.?[0-9]+)\s*s(ec|econds?)?$/i);
-  if (sMatch) return Math.round(parseFloat(sMatch[1]) * 1000);
-  // no unit: decide by magnitude — < 20 → seconds, else ms
-  const num = parseFloat(s);
-  if (!Number.isNaN(num)) {
-    if (num < 20) return Math.round(num * 1000); // assume seconds
-    return Math.round(num); // assume ms
-  }
-  return undefined;
-}
-
-function parseServerTiming(header: string | undefined): number | undefined {
-  if (!header) return undefined;
-  // Example: "cache;desc=HIT, edge;dur=1, origin;dur=45"
-  // We pick the largest dur as a conservative page time (ms)
-  const parts = header.split(/,(?![^\(]*\))/g).map((p) => p.trim());
-  let best: number | undefined = undefined;
-  for (const p of parts) {
-    const m = p.match(/dur\s*=\s*([0-9]*\.?[0-9]+)/i);
-    if (m) {
-      const ms = Math.round(parseFloat(m[1]));
-      if (!Number.isNaN(ms)) best = Math.max(best ?? 0, ms);
-    }
-  }
-  return best;
-}
-
 // Case-insensitive header getter
 function getHeaderCI(
   headers: Record<string, string | number | null> | undefined,
@@ -944,8 +910,6 @@ async function buildVTMetadata(
       Object.entries(selectedMaybe).map(([k, v]) => [k, v ?? ABSENT])
     ) as Record<string, string | number | null>;
 
-  // Count tokens in Content-Security-Policy using delimiters: space and semicolon,
-  // and ensure the count key appears FIRST in the final headers object.
   let contentSecurityPolicyCount: number | null;
   if (cspValues == null) {
     contentSecurityPolicyCount = null;
@@ -1411,7 +1375,7 @@ async function buildVTMetadata(
     }
   }
 
-  const outputObject: any = {
+  const selectedFields: any = {
     // Basic
     url,
     urlEntropy,
@@ -1487,13 +1451,12 @@ async function buildVTMetadata(
     },
   };
 
-  return outputObject;
+  return selectedFields;
 }
 
-function finalizeOutput(outputObject: any): Record<string, any> {
-  const output = deepMarkAbsent(outputObject);
+function finalizeOutput(selectedFields: any): Record<string, any> {
+  const output = deepMarkAbsent(selectedFields);
   const flattenedOutput = flattenObject(output);
-  //const mask = loadOutputMask();
   const mask = CUSTOMED_FIELDS_NAME;
 
   const maskedOutput = applyOutputMask(flattenedOutput, mask);
@@ -1585,8 +1548,8 @@ export async function scanUrl(
       return { status: "waitlist", note: "analysis not complete" };
     }
 
-    let outputObject: any = await buildVTMetadata(url, urlReport);
-    let flattened = finalizeOutput(outputObject);
+    let selectedFields: any = await buildVTMetadata(url, urlReport);
+    let flattened = finalizeOutput(selectedFields);
 
     return { status: "success", data: flattened };
   } catch (err: any) {
