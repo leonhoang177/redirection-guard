@@ -239,13 +239,67 @@ function appendToErrorLog(url: string, error: string, context?: ScanContext) {
 }
 
 // ====== API CONFIG ======
-const API_KEY = (process.env.VT_API_KEY || "").trim();
 const BASE = "https://www.virustotal.com/api/v3";
 const HARDCODED_URL = "https://www.apple.com/";
 
-if (!API_KEY) {
-  console.error("Missing VT_API_KEY env var.");
+function parseApiKeys(): string[] {
+  const rawList = (process.env.VT_API_KEYS || "").trim();
+  let keys: string[] = [];
+  if (rawList) {
+    keys = rawList
+      .split(/[,\s]+/)
+      .map((k) => k.trim())
+      .filter(Boolean);
+  }
+  if (keys.length === 0) {
+    const single = (process.env.VT_API_KEY || "").trim();
+    if (single) keys = [single];
+  }
+  return Array.from(new Set(keys));
+}
+
+const API_KEYS = parseApiKeys();
+
+if (API_KEYS.length === 0) {
+  console.error("Missing VT_API_KEY(S). Provide VT_API_KEY or VT_API_KEYS env vars.");
   process.exit(1);
+}
+
+let activeApiKeyIndex = 0;
+
+function getActiveApiKey(): string {
+  return API_KEYS[activeApiKeyIndex];
+}
+
+function maskApiKey(key: string): string {
+  if (key.length <= 8) return `${key.slice(0, 2)}***${key.slice(-2)}`;
+  return `${key.slice(0, 4)}…${key.slice(-4)}`;
+}
+
+function tryRotateApiKey(reason: string): boolean {
+  if (activeApiKeyIndex >= API_KEYS.length - 1) {
+    console.warn(
+      `VT API key rotation requested (${reason}) but no additional keys remain.`
+    );
+    return false;
+  }
+
+  const previous = maskApiKey(API_KEYS[activeApiKeyIndex]);
+  activeApiKeyIndex += 1;
+  const next = maskApiKey(API_KEYS[activeApiKeyIndex]);
+  console.warn(`Rotating VT API key (${reason}). ${previous} -> ${next}`);
+  return true;
+}
+
+function isQuotaOrForbiddenStatus(status: number, body: string): boolean {
+  if (status === 403 || status === 429) return true;
+  const normalized = body.toLowerCase();
+  return (
+    normalized.includes("quota") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("forbidden") ||
+    normalized.includes("too many requests")
+  );
 }
 
 // Encode plain URL → VT base64url (no padding)
@@ -258,30 +312,50 @@ function encodeVTUrl(u: string): string {
 }
 
 // ====== API CALL ======
-async function vtGet(path: string) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "x-apikey": API_KEY },
-  });
-  if (!res.ok) {
+async function performVTRequest(
+  method: "GET" | "POST",
+  path: string,
+  init: RequestInit = {}
+) {
+  while (true) {
+    const res = await fetch(`${BASE}${path}`, {
+      ...init,
+      method,
+      headers: {
+        ...(init.headers || {}),
+        "x-apikey": getActiveApiKey(),
+      },
+    });
+
+    if (res.ok) return res;
+
     const text = await res.text();
-    throw new Error(`GET ${path} -> ${res.status}: ${text}`);
+    if (isQuotaOrForbiddenStatus(res.status, text)) {
+      const rotated = tryRotateApiKey(
+        `${method} ${path} -> ${res.status}`
+      );
+      if (rotated) continue;
+      throw new Error(
+        `VirusTotal quota exhausted across all API keys. Last response ${method} ${path} -> ${res.status}: ${text}`
+      );
+    }
+
+    throw new Error(`${method} ${path} -> ${res.status}: ${text}`);
   }
+}
+
+async function vtGet(path: string) {
+  const res = await performVTRequest("GET", path);
   return res.json();
 }
 
 async function vtPost(path: string, body: URLSearchParams) {
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
+  const res = await performVTRequest("POST", path, {
     headers: {
-      "x-apikey": API_KEY,
       "content-type": "application/x-www-form-urlencoded",
     },
     body,
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`POST ${path} -> ${res.status}: ${text}`);
-  }
   return res.json();
 }
 
