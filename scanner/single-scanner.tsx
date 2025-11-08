@@ -47,7 +47,7 @@ const ABSENT = null;
 
 type OutputMask = Record<string, string | null>;
 
-const DEFAULT_OUTPUT_MASK_PATH = "./inputs/field-name.json";
+/*const DEFAULT_OUTPUT_MASK_PATH = "./inputs/field-name.json";
 const OUTPUT_MASK_ENV = (process.env.OUTPUT_MASK_PATH || "").trim();
 const OUTPUT_MASK_PATH = path.resolve(
   OUTPUT_MASK_ENV || DEFAULT_OUTPUT_MASK_PATH
@@ -99,6 +99,7 @@ function loadOutputMask(): OutputMask {
     return cachedOutputMask;
   }
 }
+  */
 
 function applyOutputMask(
   flattened: Record<string, any>,
@@ -1513,10 +1514,53 @@ async function buildVTMetadata(
   return outputObject;
 }
 
+const outputMask = {
+  url: "url",
+  urlEntropy: "urlEntropy",
+  hostname: "hostname",
+  isHttps: "isHttps",
+  contentInfoTitle: "title",
+  contentInfoFaviconHostMatch: "faviconMatch",
+  contentInfoCharset: "charset",
+  contentInfoMimeType: "MIMEType",
+  contentInfoMetaTagCount: "metaTagCount",
+  reputation: "reputation",
+  maliciousVotes: "maliciousVotes",
+  suspiciousVotes: "suspiciousVotes",
+  servicesKeyWords: "services",
+  suspiciousFeatures: "features",
+  redirectCount: "redirectCount",
+  redirectEntropy: "redirectEntropy",
+  redirectSimilarity: "redirectSimilarity",
+  dnsRatio: "dnsRatio",
+  domainAge: "domainAge",
+  domainValidDays: "domainValidDays",
+  networkAsOwner: "networkAsOwner",
+  networkCountry: "networkCountry",
+  httpInfoStatusCode: "statusCode",
+  headerHttpServer: "serverName",
+  headerContentSecurityPolicyCount: "contentSecurityPolicyCount",
+  headerStrictTransportSecurity: "strictTransportSecurity",
+  headerXFrameOptions: "xFrameOptions",
+  headerXContentTypeOptions: "xContentTypeOptions",
+  headerCacheControl: "cacheControl",
+  tlsInfoSubjectMatch: "tlsSubjectMatch",
+  tlsInfoValidDays: "tlsValidDays",
+  tlsInfoSanEntriesCount: "tlsSANCount",
+  tlsInfoSanEntriesEntropy: "tlsSANEntropy",
+  tlsInfoSanEntriesSimilarity: "tlsSANSimilarity",
+  externalResourcesEmbeddedUrlsCount: "embeddedURLCount",
+  externalResourcesEmbeddedUrlsEntropy: "embeddedURLEntropy",
+  externalResourcesEmbeddedUrlsSimilarity: "embeddedURLSimilarity",
+  externalResourcesTrackersCount: "embeddedTrackersCount",
+  nullCount: "nullCount",
+};
+
 function finalizeOutput(outputObject: any): Record<string, any> {
   const output = deepMarkAbsent(outputObject);
   const flattenedOutput = flattenObject(output);
-  const mask = loadOutputMask();
+  //const mask = loadOutputMask();
+  const mask = outputMask;
 
   const maskedOutput = applyOutputMask(flattenedOutput, mask);
   const nullCount = countNullValues(maskedOutput);
