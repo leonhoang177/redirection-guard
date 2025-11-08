@@ -47,7 +47,7 @@ const ABSENT = null;
 
 type OutputMask = Record<string, string | null>;
 
-const INSTRUCTION =
+export const INSTRUCTION =
   "INSTRUCT: Cyber Security Analyst. Classify: 'phish' or 'legit'.::EXP: null=failed to read. isHttps=URL secure. entropy=avg randomness. similarity=avg text match. dnsRatio=age/count. faviconMatch=favicon URL match host. tlsSubjectMatch=TLS subject match host.::HINTS: Higher reputation: more % legit. maliciousVotes>0: 100% phish. domainValidDays<366: 75% phish. isHttps=false: 75% phish. suspiciousVotes>0: 75% phish. nullCount>=10: 75% phish";
 
 const CUSTOMED_FIELDS_NAME = {
@@ -212,7 +212,7 @@ function countNullValues(record: Record<string, any>): number {
   );
 }
 
-export function formatInstructionPrompt(
+export function formatPrompt(
   flattened: Record<string, any>,
   instruction?: string
 ): string | null {
@@ -1575,12 +1575,7 @@ async function run() {
   }
 
   const flattenedOutput = result.data;
-  //const instruction = loadInstructionText();
-  const instruction = INSTRUCTION;
-  const promptOutput = formatInstructionPrompt(
-    flattenedOutput,
-    instruction || ""
-  );
+  const promptOutput = formatPrompt(flattenedOutput, INSTRUCTION || "");
 
   if (promptOutput !== null) {
     fs.mkdirSync(path.dirname(PROMPT_OUTPUT_PATH), { recursive: true });

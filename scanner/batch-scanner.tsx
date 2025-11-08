@@ -5,12 +5,15 @@ import {
   ScanResult,
   WAITLIST_CSV_PATH,
   ERROR_CSV_PATH,
+  INSTRUCTION,
   appendToWaitlist,
-  formatInstructionPrompt,
+  formatPrompt,
 } from "./single-scanner";
 
 const INPUT_PATH = "./inputs/input.csv";
 const OUTPUT_DIR = "./outputs";
+const FAILED_CSV_PATH = `${OUTPUT_DIR}/failed.csv`;
+const FAILED_HEADERS = ["order", "url", "label"];
 
 type InputRecord = {
   order: string;
@@ -60,7 +63,7 @@ function buildOutputPath(firstOrder?: string, lastOrder?: string): string {
 function resetOutputFiles(outputPath: string) {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   fs.writeFileSync(outputPath, "", "utf-8");
-  for (const logPath of [WAITLIST_CSV_PATH, ERROR_CSV_PATH]) {
+  for (const logPath of [WAITLIST_CSV_PATH, ERROR_CSV_PATH, FAILED_CSV_PATH]) {
     try {
       if (fs.existsSync(logPath)) {
         fs.unlinkSync(logPath);
@@ -186,6 +189,38 @@ function isQuotaOrForbiddenError(message: string): boolean {
   );
 }
 
+function csvEscape(value: string | undefined): string {
+  if (value === undefined || value === null) return "";
+  const str = String(value);
+  if (/[",\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function appendToFailedCsv(record: InputRecord) {
+  try {
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+    if (!fs.existsSync(FAILED_CSV_PATH)) {
+      fs.writeFileSync(
+        FAILED_CSV_PATH,
+        `${FAILED_HEADERS.map(csvEscape).join(",")}\n`,
+        "utf-8"
+      );
+    }
+    fs.appendFileSync(
+      FAILED_CSV_PATH,
+      `${[record.order, record.url, record.label].map(csvEscape).join(",")}\n`,
+      "utf-8"
+    );
+  } catch (err: any) {
+    console.error(
+      `Failed to write ${FAILED_CSV_PATH}:`,
+      err?.message || String(err)
+    );
+  }
+}
+
 async function processRecords(
   records: InputRecord[],
   instruction: string,
@@ -205,17 +240,17 @@ async function processRecords(
       });
 
       if (result.status === "success") {
-        const inputText = formatInstructionPrompt(result.data, instruction);
-        if (inputText === null) {
-          console.log(
-            `Skipped ID ${record.order}: no valid instruction provided.`
-          );
+        const prompt = formatPrompt(result.data, instruction);
+
+        if (prompt === null) {
+          console.log(`Failed to scan ID ${record.order}: Invalid prompt.`);
+          appendToFailedCsv(record);
           continue;
         }
 
         const outputRecord = {
           contents: [
-            { role: "user", parts: [{ text: inputText }] },
+            { role: "user", parts: [{ text: prompt }] },
             { role: "model", parts: [{ text: record.label ?? "" }] },
           ],
         };
@@ -256,6 +291,7 @@ async function processRecords(
 }
 
 async function runBatch() {
+  const instruction = INSTRUCTION || "";
   let currentRecords: InputRecord[];
   try {
     currentRecords = readInputRecords(INPUT_PATH);
