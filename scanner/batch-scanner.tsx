@@ -5,11 +5,18 @@ import {
   ScanResult,
   WAITLIST_CSV_PATH,
   ERROR_CSV_PATH,
+  appendToWaitlist,
 } from "./single-scanner";
 
-const INPUT_PATH = "./inputs/mixed_urls_3.csv";
-const OUTPUT_PATH = "./outputs/output.jsonl";
+const INPUT_PATH = "./inputs/input.csv";
+const OUTPUT_DIR = "./outputs";
 const INSTRUCTION_PATH = "./inputs/instruction.txt";
+
+type InputRecord = {
+  order: string;
+  url: string;
+  label: string;
+};
 
 function parseDelimitedLine(line: string): string[] {
   const cells: string[] = [];
@@ -55,47 +62,23 @@ function formatInputText(
   return `${instruction}::DATA: ${body} CLASSIFICATION:`;
 }
 
-async function runBatch() {
-  let instruction = "";
-  try {
-    instruction = fs.readFileSync(INSTRUCTION_PATH, "utf-8").trim();
-  } catch {
-    instruction = "";
+function sanitizeForFilename(value: string): string {
+  const safe = value.replace(/[^a-zA-Z0-9-_]/g, "_");
+  return safe.length > 0 ? safe : "unknown";
+}
+
+function buildOutputPath(firstOrder?: string, lastOrder?: string): string {
+  if (!firstOrder || !lastOrder) {
+    return `${OUTPUT_DIR}/output.jsonl`;
   }
+  const first = sanitizeForFilename(firstOrder);
+  const last = sanitizeForFilename(lastOrder);
+  return `${OUTPUT_DIR}/${first}-${last}.jsonl`;
+}
 
-  let input: string;
-  try {
-    input = fs.readFileSync(INPUT_PATH, "utf-8");
-  } catch (err: any) {
-    console.error(`Failed to read ${INPUT_PATH}:`, err?.message || String(err));
-    process.exitCode = 1;
-    return;
-  }
-
-  const lines = input
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  if (lines.length <= 1) {
-    console.log("No data rows found in CSV. Nothing to do.");
-    return;
-  }
-
-  const header = parseDelimitedLine(lines[0]);
-  const urlIndex = header.findIndex(
-    (h) => h.toLowerCase() === "url" || h.toLowerCase() === "link"
-  );
-  const labelIndex = header.findIndex((h) => h.toLowerCase() === "label");
-  const orderIndex = header.findIndex((h) => h.toLowerCase() === "order");
-  if (urlIndex === -1 || labelIndex === -1) {
-    console.error("Input CSV must contain 'Url' and 'Label' columns.");
-    process.exitCode = 1;
-    return;
-  }
-
-  fs.mkdirSync("./outputs", { recursive: true });
-  fs.writeFileSync(OUTPUT_PATH, "", "utf-8");
+function resetOutputFiles(outputPath: string) {
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  fs.writeFileSync(outputPath, "", "utf-8");
   for (const logPath of [WAITLIST_CSV_PATH, ERROR_CSV_PATH]) {
     try {
       if (fs.existsSync(logPath)) {
@@ -105,51 +88,248 @@ async function runBatch() {
       console.error(`Failed to reset ${logPath}:`, err?.message || String(err));
     }
   }
+}
 
-  for (let i = 1; i < lines.length; i++) {
-    const rawLine = lines[i];
-    if (!rawLine.trim()) continue;
+function getColumnIndex(header: string[], candidates: string[]): number {
+  for (const candidate of candidates) {
+    const idx = header.findIndex((cell) => cell === candidate);
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+function parseCsvRecords(raw: string, sourceLabel: string): InputRecord[] {
+  const lines = raw.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length <= 1) return [];
+
+  const header = parseDelimitedLine(lines[0].replace(/^\uFEFF/, ""));
+  const normalized = header.map((cell) => cell.trim().toLowerCase());
+  const urlIndex = getColumnIndex(normalized, ["url", "link"]);
+  const labelIndex = getColumnIndex(normalized, ["label"]);
+  if (urlIndex === -1 || labelIndex === -1) {
+    throw new Error(
+      `[${sourceLabel}] Input CSV must contain 'Url' and 'Label' columns.`
+    );
+  }
+  const orderIndex = getColumnIndex(normalized, ["order", "id"]);
+
+  const records: InputRecord[] = [];
+  for (let lineIndex = 1; lineIndex < lines.length; lineIndex++) {
+    const rawLine = lines[lineIndex];
+    if (!rawLine || !rawLine.trim()) continue;
     const fields = parseDelimitedLine(rawLine);
-    const url = fields[urlIndex];
-    const label = fields[labelIndex];
-    const order = orderIndex !== -1 ? fields[orderIndex] : String(i);
+    const url = (fields[urlIndex] ?? "").trim();
     if (!url) {
-      console.error(`Skipping row ${i}: missing URL.`);
+      console.error(`[${sourceLabel}] Skipping row ${lineIndex}: missing URL.`);
       continue;
     }
+    const label = (fields[labelIndex] ?? "").trim();
+    const fallbackOrder = String(records.length + 1);
+    const orderValue =
+      orderIndex !== -1 && fields[orderIndex]
+        ? fields[orderIndex].trim() || fallbackOrder
+        : fallbackOrder;
 
-    console.log(`\n=== Processing ${url} ===`);
+    records.push({
+      order: orderValue,
+      url,
+      label,
+    });
+  }
+
+  return records;
+}
+
+function readInputRecords(filePath: string): InputRecord[] {
+  try {
+    const input = fs.readFileSync(filePath, "utf-8");
+    return parseCsvRecords(input, "input");
+  } catch (err: any) {
+    throw new Error(
+      `Failed to read ${filePath}: ${err?.message || String(err)}`
+    );
+  }
+}
+
+function drainWaitlistRecords(): InputRecord[] {
+  if (!fs.existsSync(WAITLIST_CSV_PATH)) return [];
+
+  try {
+    const raw = fs.readFileSync(WAITLIST_CSV_PATH, "utf-8");
+    const records = parseCsvRecords(raw, "waitlist");
     try {
-      const result: ScanResult = await scanUrl(url, {
-        order,
-        label,
-        rawUrl: url,
+      fs.unlinkSync(WAITLIST_CSV_PATH);
+    } catch (err: any) {
+      console.error(
+        `Failed to clear ${WAITLIST_CSV_PATH}:`,
+        err?.message || String(err)
+      );
+    }
+    return records;
+  } catch (err: any) {
+    console.error(
+      `Failed to read ${WAITLIST_CSV_PATH}:`,
+      err?.message || String(err)
+    );
+    return [];
+  }
+}
+
+function appendRecordToWaitlist(record: InputRecord, note?: string) {
+  appendToWaitlist(record.url, note, {
+    order: record.order,
+    label: record.label,
+    rawUrl: record.url,
+  });
+}
+
+function appendRemainingRecordsToWaitlist(
+  records: InputRecord[],
+  startIndex: number,
+  note?: string
+) {
+  for (let i = startIndex; i < records.length; i++) {
+    appendRecordToWaitlist(records[i], note);
+  }
+}
+
+function isQuotaOrForbiddenError(message: string): boolean {
+  if (!message) return false;
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("quota") ||
+    normalized.includes("forbidden") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("too many requests") ||
+    normalized.includes("429") ||
+    normalized.includes("403")
+  );
+}
+
+async function processRecords(
+  records: InputRecord[],
+  instruction: string,
+  outputPath: string
+): Promise<{ quotaHit: boolean }> {
+  for (let index = 0; index < records.length; index++) {
+    const record = records[index];
+    console.log(`\n=== Processing ID ${record.order} ===`);
+
+    try {
+      const result: ScanResult = await scanUrl(record.url, {
+        order: record.order,
+        label: record.label,
+        rawUrl: record.url,
+        logId: `ID ${record.order}`,
+        disableAutomaticWaitlist: true,
       });
+
       if (result.status === "success") {
         const inputText = formatInputText(result.data, instruction);
         if (inputText === null) {
-          console.log(`Skipped ${url}: no valid instruction provided.`);
+          console.log(
+            `Skipped ID ${record.order}: no valid instruction provided.`
+          );
           continue;
         }
 
-        // ✅ Convert into Gemini SFT format
-        const record = {
+        const outputRecord = {
           contents: [
             { role: "user", parts: [{ text: inputText }] },
-            { role: "model", parts: [{ text: label ?? "" }] },
+            { role: "model", parts: [{ text: record.label ?? "" }] },
           ],
         };
 
-        fs.appendFileSync(OUTPUT_PATH, `${JSON.stringify(record)}\n`, "utf-8");
-        console.log(`Saved result for ${url}`);
+        fs.appendFileSync(
+          outputPath,
+          `${JSON.stringify(outputRecord)}\n`,
+          "utf-8"
+        );
+        console.log(`Saved result for ID ${record.order}`);
       } else if (result.status === "waitlist") {
-        console.log(`No result generated for ${url} (likely waitlisted).`);
+        appendRecordToWaitlist(record, result.note);
+        console.log(`ID ${record.order} added to waitlist.`);
       } else {
-        console.error(`Error scanning ${url}: ${result.error}`);
+        console.error(`Error scanning ID ${record.order}: ${result.error}`);
+        if (isQuotaOrForbiddenError(result.error)) {
+          appendRecordToWaitlist(record, "pending (quota)");
+          appendRemainingRecordsToWaitlist(
+            records,
+            index + 1,
+            "pending (quota)"
+          );
+          return { quotaHit: true };
+        }
       }
     } catch (err: any) {
-      console.error(`Error scanning ${url}:`, err?.message || String(err));
+      const message = err?.message || String(err);
+      console.error(`Unexpected failure for ID ${record.order}: ${message}`);
+      if (isQuotaOrForbiddenError(message)) {
+        appendRecordToWaitlist(record, "pending (quota)");
+        appendRemainingRecordsToWaitlist(records, index + 1, "pending (quota)");
+        return { quotaHit: true };
+      }
     }
+  }
+
+  return { quotaHit: false };
+}
+
+async function runBatch() {
+  let instruction = "";
+  try {
+    instruction = fs.readFileSync(INSTRUCTION_PATH, "utf-8").trim();
+  } catch {
+    instruction = "";
+  }
+
+  let currentRecords: InputRecord[];
+  try {
+    currentRecords = readInputRecords(INPUT_PATH);
+  } catch (err: any) {
+    console.error(err?.message || String(err));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (currentRecords.length === 0) {
+    console.log("No data rows found in CSV. Nothing to do.");
+    return;
+  }
+
+  const firstOrder = currentRecords[0]?.order;
+  const lastOrder = currentRecords[currentRecords.length - 1]?.order;
+  const outputPath = buildOutputPath(firstOrder, lastOrder);
+  resetOutputFiles(outputPath);
+
+  let iteration = 1;
+  while (currentRecords.length > 0) {
+    console.log(
+      `\n--- Batch iteration ${iteration} (${currentRecords.length} URLs) ---`
+    );
+    const { quotaHit } = await processRecords(
+      currentRecords,
+      instruction,
+      outputPath
+    );
+    if (quotaHit) {
+      console.warn(
+        "Stopping batch scanning because of quota or unexpected error. Waitlist preserved for retry."
+      );
+      return;
+    }
+
+    const nextRecords = drainWaitlistRecords();
+    if (nextRecords.length === 0) {
+      console.log("Waitlist empty. Batch scanning complete.");
+      break;
+    }
+
+    currentRecords = nextRecords;
+    iteration++;
+    console.log(
+      `Waitlist contains ${currentRecords.length} URLs. Starting next pass.`
+    );
   }
 }
 

@@ -26,6 +26,8 @@ export interface ScanContext {
   order?: string;
   label?: string;
   rawUrl?: string;
+  logId?: string;
+  disableAutomaticWaitlist?: boolean;
 }
 
 export type ScanResult =
@@ -214,7 +216,7 @@ function appendCsvRow(
   }
 }
 
-function appendToWaitlist(
+export function appendToWaitlist(
   url: string,
   note: string | undefined,
   context?: ScanContext
@@ -1428,6 +1430,12 @@ function validateURL(url: string): string | null {
   } else return null;
 }
 
+function describeLogTarget(url: string, context?: ScanContext): string {
+  if (context?.logId && context.logId.trim().length > 0) return context.logId;
+  if (context?.order && context.order.trim().length > 0) return context.order;
+  return url;
+}
+
 export async function scanUrl(
   target: string,
   context: ScanContext = {}
@@ -1439,7 +1447,7 @@ export async function scanUrl(
       error: "Invalid URL. Please provide an URL starts with 'http' or 'https'",
     };
   }
-  console.log(`VirusTotal URL scan for: ${url}`);
+  console.log(`VirusTotal URL scan for: ${describeLogTarget(url, context)}`);
 
   try {
     let urlReport: any | null = null;
@@ -1458,7 +1466,9 @@ export async function scanUrl(
           // ignore submission failures; still waitlist the URL
         }
         const waitlistUrl = context?.rawUrl ?? target;
-        appendToWaitlist(waitlistUrl, "no VT report", context);
+        if (!context?.disableAutomaticWaitlist) {
+          appendToWaitlist(waitlistUrl, "no VT report", context);
+        }
         return { status: "waitlist", note: "no VT report" };
       }
       const errorUrl = context?.rawUrl ?? target;
@@ -1472,7 +1482,9 @@ export async function scanUrl(
         "VirusTotal record exists but analysis not complete — adding to waitlist."
       );
       const waitlistUrl = context?.rawUrl ?? target;
-      appendToWaitlist(waitlistUrl, "analysis not complete", context);
+      if (!context?.disableAutomaticWaitlist) {
+        appendToWaitlist(waitlistUrl, "analysis not complete", context);
+      }
       return { status: "waitlist", note: "analysis not complete" };
     }
 
