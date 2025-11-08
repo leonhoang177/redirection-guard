@@ -37,7 +37,7 @@ export type ScanResult =
 
 export const WAITLIST_CSV_PATH = "./outputs/waitlist.csv";
 export const ERROR_CSV_PATH = "./outputs/error.csv";
-export const DEFAULT_INSTRUCTION_PATH = "./inputs/instruction.txt";
+//export const DEFAULT_INSTRUCTION_PATH = "./inputs/instruction.txt";
 const PROMPT_OUTPUT_PATH = "./outputs/prompt.txt";
 const FIELDS_OUTPUT_PATH = "./outputs/fields.json";
 
@@ -46,6 +46,9 @@ const ERROR_HEADERS = ["order", "url", "label", "error"];
 const ABSENT = null;
 
 type OutputMask = Record<string, string | null>;
+
+const INSTRUCTION =
+  "INSTRUCT: Cyber Security Analyst. Classify: 'phish' or 'legit'.::EXP: null=failed to read. isHttps=URL secure. entropy=avg randomness. similarity=avg text match. dnsRatio=age/count. faviconMatch=favicon URL match host. tlsSubjectMatch=TLS subject match host.::HINTS: Higher reputation: more % legit. maliciousVotes>0: 100% phish. domainValidDays<366: 75% phish. isHttps=false: 75% phish. suspiciousVotes>0: 75% phish. nullCount>=10: 75% phish";
 
 /*const DEFAULT_OUTPUT_MASK_PATH = "./inputs/field-name.json";
 const OUTPUT_MASK_ENV = (process.env.OUTPUT_MASK_PATH || "").trim();
@@ -187,7 +190,7 @@ function countNullValues(record: Record<string, any>): number {
   );
 }
 
-export function readInstructionText(): string {
+/*export function readInstructionText(): string {
   const envInstruction = (process.env.INSTRUCTION_TEXT || "").trim();
   if (envInstruction.length > 0) return envInstruction;
 
@@ -196,7 +199,7 @@ export function readInstructionText(): string {
   } catch {
     return "";
   }
-}
+}*/
 
 export function formatInstructionPrompt(
   flattened: Record<string, any>,
@@ -217,10 +220,10 @@ export function formatInstructionPrompt(
   return `${instruction}::DATA: ${body} CLASSIFICATION:`;
 }
 
-function loadInstructionText(): string | null {
+/*function loadInstructionText(): string | null {
   const text = readInstructionText();
   return text.length > 0 ? text : null;
-}
+}*/
 
 function csvEscape(value: string | undefined): string {
   if (value === undefined || value === null) return "";
@@ -1678,7 +1681,8 @@ async function run() {
   }
 
   const flattenedOutput = result.data;
-  const instruction = loadInstructionText();
+  //const instruction = loadInstructionText();
+  const instruction = INSTRUCTION;
   const promptOutput = formatInstructionPrompt(
     flattenedOutput,
     instruction || ""
