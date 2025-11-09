@@ -1,0 +1,19 @@
+{
+  "name": "extension-2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "esbuild src/background.ts src/popup.ts --bundle --outdir=dist"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.18.3",
+  "devDependencies": {
+    "@types/chrome": "^0.1.27",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.9.3"
+  }
+}

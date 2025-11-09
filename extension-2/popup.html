@@ -1,0 +1,32 @@
+<!-- popup.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Gemini Vertex AI Processor</title>
+    <style>
+      body {
+        width: 300px;
+        padding: 10px;
+        font-family: sans-serif;
+      }
+      #status {
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        white-space: pre-wrap;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Vertex AI LLM Analyzer</h3>
+    <button id="triggerButton">Analyze Hardcoded Text</button>
+    <div id="status">Ready.</div>
+    <!-- 
+      IMPORTANT: This points to the compiled JS file in the 'dist' folder.
+      Ensure you have run 'pnpm run build' before reloading.
+    -->
+    <script src="dist/popup.js"></script>
+  </body>
+</html>
