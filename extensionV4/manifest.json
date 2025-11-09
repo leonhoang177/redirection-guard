@@ -15,7 +15,6 @@
     "alarms"
   ],
   "host_permissions": [
-    "https://www.virustotal.com/*",
     "<all_urls>"
   ],
   "action": {

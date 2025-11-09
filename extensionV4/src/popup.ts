@@ -1,15 +1,9 @@
-import { VirusTotalService } from "./api.js";
-import { VTURLMetadata } from "./types.js";
-
 // DOM Elements
-const apiKeyInput = document.getElementById("apiKey") as HTMLInputElement;
-const saveApiKeyBtn = document.getElementById("saveApiKey") as HTMLButtonElement;
 const urlInput = document.getElementById("urlInput") as HTMLInputElement;
 const scanBtn = document.getElementById("scanBtn") as HTMLButtonElement;
 const scanCurrentBtn = document.getElementById("scanCurrentBtn") as HTMLButtonElement;
-const exportBtn = document.getElementById("exportBtn") as HTMLButtonElement;
 const loader = document.getElementById("loader") as HTMLDivElement;
-const status = document.getElementById("status") as HTMLDivElement;
+const statusDiv = document.getElementById("status") as HTMLDivElement;
 const results = document.getElementById("results") as HTMLDivElement;
 const verdictDisplay = document.getElementById("verdictDisplay") as HTMLDivElement;
 const detailedResults = document.getElementById("detailedResults") as HTMLDivElement;
@@ -17,20 +11,11 @@ const extensionStatus = document.getElementById("extensionStatus") as HTMLSpanEl
 const cachedCount = document.getElementById("cachedCount") as HTMLSpanElement;
 const protectedCount = document.getElementById("protectedCount") as HTMLSpanElement;
 
-let vtService: VirusTotalService | null = null;
 let showDetailedResults = false;
 
 // Initialize
 document.addEventListener("DOMContentLoaded", async () => {
-  // Load saved API key
-  const savedKey = await loadApiKey();
-  if (savedKey) {
-    apiKeyInput.value = savedKey;
-    vtService = new VirusTotalService(savedKey);
-    showStatus("✅ API Key loaded successfully!", "success");
-  } else {
-    showStatus("⚠️ Please configure your VirusTotal API key", "info");
-  }
+  showStatus("✅ Redirect Guard ready", "success");
 
   // Load extension stats
   await updateStats();
@@ -49,36 +34,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-// Save API Key
-saveApiKeyBtn.addEventListener("click", async () => {
-  const apiKey = apiKeyInput.value.trim();
-
-  if (!apiKey) {
-    showStatus("Please enter an API key", "error");
-    return;
-  }
-
-  if (apiKey.length !== 64) {
-    showStatus("API key should be 64 characters long", "error");
-    return;
-  }
-
-  await saveApiKey(apiKey);
-  vtService = new VirusTotalService(apiKey);
-  showStatus("✅ API Key saved successfully!", "success");
-});
-
 // Scan URL
 scanBtn.addEventListener("click", async () => {
   const url = urlInput.value.trim();
 
   if (!url) {
     showStatus("Please enter a URL", "error");
-    return;
-  }
-
-  if (!vtService) {
-    showStatus("Please save your API key first", "error");
     return;
   }
 
@@ -92,11 +53,6 @@ scanBtn.addEventListener("click", async () => {
 
 // Scan Current Tab
 scanCurrentBtn.addEventListener("click", async () => {
-  if (!vtService) {
-    showStatus("Please save your API key first", "error");
-    return;
-  }
-
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
@@ -118,96 +74,91 @@ scanCurrentBtn.addEventListener("click", async () => {
   }
 });
 
-// Scan URL Function
+// Scan URL Function (using local heuristics)
 async function scanUrl(url: string): Promise<void> {
   showLoader(true);
-  showStatus("🔍 Scanning URL for security threats...", "info");
+  showStatus("🔎 Analyzing URL for suspicious patterns...", "info");
   results.style.display = "none";
 
   try {
-    const metadata = await vtService!.scanURL(url);
-    displayResults(metadata);
+    // Get analysis from background script
+    const analysis = await chrome.runtime.sendMessage({ type: "analyzeUrl", url });
+    
+    if (!analysis) {
+      throw new Error("Failed to analyze URL");
+    }
+
+    displayResults(url, analysis);
     showStatus("✅ Scan completed!", "success");
   } catch (error: any) {
-    const errorMessage = error.message.includes("quota")
-      ? "API quota exceeded. Please wait or upgrade your VirusTotal account."
-      : `Error: ${error.message}`;
-    showStatus(errorMessage, "error");
+    showStatus(`Error: ${error.message}`, "error");
     console.error("Scan error:", error);
   } finally {
     showLoader(false);
   }
 }
 
-// Display Results with Simple Verdict
-function displayResults(metadata: VTURLMetadata): void {
-  const verdict = getSimpleVerdict(metadata);
-  const verdictClass = getVerdictClass(verdict);
+// Display Results
+function displayResults(url: string, analysis: { verdict: string; reasons: string[] }): void {
+  const { verdict, reasons } = analysis;
+  const verdictClass = getVerdictClass(verdict.toUpperCase());
   
   // Show simple verdict prominently
   verdictDisplay.innerHTML = `
-    <div class="verdict-icon">${getVerdictIcon(verdict)}</div>
-    <div class="verdict-text">This URL is ${verdict}</div>
+    <div class="verdict-icon">${getVerdictIcon(verdict.toUpperCase())}</div>
+    <div class="verdict-text">This URL is ${verdict.toUpperCase()}</div>
   `;
   verdictDisplay.className = `verdict-display ${verdictClass}`;
   verdictDisplay.style.display = "block";
 
-  // Prepare detailed results (hidden by default)
-  const detectionStats = metadata.detectionStats;
-  const domainAge = metadata.domain.domainAge 
-    ? `${Math.floor(metadata.domain.domainAge / 365)} years` 
-    : "Unknown";
+  // Parse URL for display
+  let urlObj;
+  try {
+    urlObj = new URL(url);
+  } catch {
+    urlObj = { hostname: "Invalid URL", protocol: "", pathname: "" };
+  }
 
+  // Prepare detailed results
   detailedResults.innerHTML = `
     <div class="result-section">
-      <h3>🔍 Security Analysis</h3>
-      <div class="result-item">
-        <span class="result-label">Malicious Detections:</span>
-        <span class="result-value">${detectionStats.malicious}/${detectionStats.total} engines</span>
-      </div>
-      <div class="result-item">
-        <span class="result-label">Suspicious Detections:</span>
-        <span class="result-value">${detectionStats.suspicious}/${detectionStats.total} engines</span>
-      </div>
-      <div class="result-item">
-        <span class="result-label">Harmless Detections:</span>
-        <span class="result-value">${detectionStats.harmless}/${detectionStats.total} engines</span>
-      </div>
+      <h3>🔍 Analysis Details</h3>
+      ${reasons.map(reason => `
+        <div class="result-item">
+          • ${reason}
+        </div>
+      `).join('')}
     </div>
 
     <div class="result-section">
-      <h3>🌐 Domain Information</h3>
+      <h3>🌐 URL Information</h3>
       <div class="result-item">
         <span class="result-label">Domain:</span>
-        <span class="result-value">${metadata.hostname}</span>
+        <span class="result-value">${urlObj.hostname}</span>
       </div>
       <div class="result-item">
-        <span class="result-label">Domain Age:</span>
-        <span class="result-value">${domainAge}</span>
+        <span class="result-label">Protocol:</span>
+        <span class="result-value">${urlObj.protocol}</span>
       </div>
       <div class="result-item">
-        <span class="result-label">Country:</span>
-        <span class="result-value">${metadata.network.country || "Unknown"}</span>
-      </div>
-      <div class="result-item">
-        <span class="result-label">Hosting Provider:</span>
-        <span class="result-value">${metadata.network.hostingProvider || "Unknown"}</span>
+        <span class="result-label">Path:</span>
+        <span class="result-value">${urlObj.pathname || '/'}</span>
       </div>
     </div>
 
     <div class="result-section">
-      <h3>🔒 Security Features</h3>
+      <h3>🔒 Security Checks</h3>
       <div class="result-item">
         <span class="result-label">HTTPS:</span>
-        <span class="result-value">${metadata.url.startsWith('https') ? 'Yes' : 'No'}</span>
+        <span class="result-value">${url.startsWith('https') ? '✅ Yes' : '❌ No'}</span>
       </div>
       <div class="result-item">
-        <span class="result-label">HSTS:</span>
-        <span class="result-value">${metadata.httpInfo.hsts ? 'Enabled' : 'Disabled'}</span>
+        <span class="result-label">IP Address:</span>
+        <span class="result-value">${/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(urlObj.hostname) ? '⚠️ Yes' : '✅ No'}</span>
       </div>
       <div class="result-item">
-        <span class="result-label">Redirects:</span>
-        <span class="result-value">${metadata.redirectDepth} level(s)</span>
+        <span class="result-label">Analysis Method:</span>
+        <span class="result-value">Heuristic Pattern Matching</span>
       </div>
     </div>
   `;
@@ -232,21 +183,6 @@ function displayResults(metadata: VTURLMetadata): void {
 
   // Update stats
   updateStats();
-}
-
-// Get Simple Verdict
-function getSimpleVerdict(metadata: VTURLMetadata): string {
-  const { malicious, suspicious } = metadata.detectionStats;
-
-  if (malicious > 0) {
-    return "MALICIOUS";
-  } else if (suspicious > 3) {
-    return "SUSPICIOUS";
-  } else if (suspicious > 0 || metadata.suspiciousFeatures?.length) {
-    return "UNKNOWN";
-  } else {
-    return "SAFE";
-  }
 }
 
 // Get Verdict CSS Class
@@ -292,13 +228,13 @@ async function updateStats(): Promise<void> {
 
 // Helper Functions
 function showStatus(message: string, type: "success" | "error" | "info"): void {
-  status.innerHTML = message;
-  status.className = type;
-  status.style.display = "block";
+  statusDiv.innerHTML = message;
+  statusDiv.className = type;
+  statusDiv.style.display = "block";
 
   if (type === "success") {
     setTimeout(() => {
-      status.style.display = "none";
+      statusDiv.style.display = "none";
     }, 3000);
   }
 }
@@ -315,20 +251,6 @@ function isValidUrl(url: string): boolean {
     return true;
   } catch {
     return false;
-  }
-}
-
-// Storage Functions
-async function saveApiKey(apiKey: string): Promise<void> {
-  await chrome.storage.local.set({ virusTotalApiKey: apiKey });
-}
-
-async function loadApiKey(): Promise<string | null> {
-  try {
-    const result = await chrome.storage.local.get("virusTotalApiKey");
-    return result.virusTotalApiKey || null;
-  } catch {
-    return null;
   }
 }
 
