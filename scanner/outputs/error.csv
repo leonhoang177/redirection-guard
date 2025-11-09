@@ -1,2 +1,2 @@
 order,url,label,error
-2041,http://120.60.225.111:57684/bin.sh,phish,"VirusTotal quota exhausted across all API keys. Last response GET /urls/aHR0cDovLzEyMC42MC4yMjUuMTExOjU3Njg0L2Jpbi5zaA -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
+2231,https://windowcleanershawaii.com,legit,"VirusTotal quota exhausted across all API keys. Last response GET /urls/aHR0cHM6Ly93aW5kb3djbGVhbmVyc2hhd2FpaS5jb20 -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
