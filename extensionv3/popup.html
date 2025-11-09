@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redirect Guard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 420px;
+      min-height: 500px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 16px;
+      background: linear-gradient(135deg, #2d5016 0%, #5cb85c 100%);
+      color: #333;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: #2d5016;
+      text-align: center;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .logo {
+      font-size: 24px;
+    }
+
+    .info-banner {
+      margin-bottom: 20px;
+      padding: 12px;
+      background: #d1ecf1;
+      border-radius: 8px;
+      border: 1px solid #bee5eb;
+      font-size: 12px;
+      color: #0c5460;
+      text-align: center;
+    }
+
+    .input-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #2d5016;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #d4edda;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: border-color 0.3s;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #5cb85c;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #2d5016 0%, #5cb85c 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-bottom: 8px;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(45, 80, 22, 0.4);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .secondary-btn {
+      background: #f8fff8;
+      color: #2d5016;
+      font-size: 12px;
+      padding: 10px;
+      border: 1px solid #d4edda;
+    }
+
+    .secondary-btn:hover:not(:disabled) {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      background: #e8f5e8;
+    }
+
+    #status {
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 12px;
+      display: none;
+      line-height: 1.4;
+    }
+
+    #status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    #status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    #status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+
+    #results {
+      margin-top: 20px;
+      display: none;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .verdict-display {
+      text-align: center;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .verdict-safe {
+      background: #d4edda;
+      color: #155724;
+      border: 2px solid #5cb85c;
+    }
+
+    .verdict-suspicious {
+      background: #fff3cd;
+      color: #856404;
+      border: 2px solid #ffc107;
+    }
+
+    .verdict-malicious {
+      background: #f8d7da;
+      color: #721c24;
+      border: 2px solid #dc3545;
+    }
+
+    .verdict-unknown {
+      background: #e2e3e5;
+      color: #383d41;
+      border: 2px solid #6c757d;
+    }
+
+    .result-section {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f8fff8;
+      border-radius: 8px;
+      border-left: 4px solid #5cb85c;
+    }
+
+    .result-section h3 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: #2d5016;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .result-item {
+      margin-bottom: 8px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .result-label {
+      font-weight: 600;
+      color: #2d5016;
+      display: inline-block;
+      min-width: 120px;
+    }
+
+    .loader {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #5cb85c;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+      display: none;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .button-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .button-group button {
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    .stats-section {
+      padding: 10px;
+      background: #f8fff8;
+      border-radius: 6px;
+      margin-top: 10px;
+      font-size: 11px;
+      color: #495057;
+    }
+
+    .stats-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    /* Scrollbar styling */
+    .container::-webkit-scrollbar, #results::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .container::-webkit-scrollbar-track, #results::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    .container::-webkit-scrollbar-thumb, #results::-webkit-scrollbar-thumb {
+      background: #5cb85c;
+      border-radius: 3px;
+    }
+
+    .container::-webkit-scrollbar-thumb:hover, #results::-webkit-scrollbar-thumb:hover {
+      background: #4cae4c;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>
+      <span class="logo">🛡️</span>
+      Redirect Guard
+    </h1>
+    
+    <div class="info-banner">
+      🔒 Using local heuristic analysis - No external API required
+    </div>
+
+    <div class="input-group">
+      <label for="urlInput">URL to Analyze:</label>
+      <input type="text" id="urlInput" placeholder="https://example.com">
+    </div>
+
+    <button id="scanBtn">🔎 Analyze URL</button>
+    
+    <button id="scanCurrentBtn" class="secondary-btn">📋 Analyze Current Tab</button>
+
+    <div class="loader" id="loader"></div>
+    <div id="status"></div>
+    
+    <div id="results">
+      <div id="verdictDisplay" class="verdict-display" style="display: none;"></div>
+      <div id="detailedResults" style="display: none;"></div>
+    </div>
+
+    <div class="stats-section">
+      <div class="stats-item">
+        <span>Extension Status:</span>
+        <span id="extensionStatus">Active</span>
+      </div>
+      <div class="stats-item">
+        <span>Cached Results:</span>
+        <span id="cachedCount">0</span>
+      </div>
+      <div class="stats-item">
+        <span>Protected Sites:</span>
+        <span id="protectedCount">0</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="dist/popup.js" type="module"></script>
+</body>
+</html>
