@@ -2,14 +2,14 @@
   "devDependencies": {
     "@types/node": "^24.8.1",
     "ts-node": "^10.9.2",
-    "tsx": "^4.19.2",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
   "type": "module",
   "scripts": {
-    "sscan": "tsx single-scanner.tsx",
-    "sscan:url": "tsx single-scanner.tsx https://apple.com",
-    "bscan": "tsx batch-scanner.tsx"
+    "sscan": "tsx single-scanner.ts",
+    "sscan:url": "tsx single-scanner.ts https://apple.com",
+    "bscan": "tsx batch-scanner.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
