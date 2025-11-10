@@ -1,2 +1,2 @@
 order,url,label,error
-3310,https://cryptoarena.com,legit,"VirusTotal quota exhausted across all API keys. Last response GET /urls/aHR0cHM6Ly9jcnlwdG9hcmVuYS5jb20 -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
+4176,http://45.125.66.89/tmp/f96ddccee62b5ae86e381ed0f1b2d512.zip,phish,"VirusTotal quota exhausted across all API keys. Last response GET /urls/aHR0cDovLzQ1LjEyNS42Ni44OS90bXAvZjk2ZGRjY2VlNjJiNWFlODZlMzgxZWQwZjFiMmQ1MTIuemlw -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
