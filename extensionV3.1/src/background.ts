@@ -167,7 +167,7 @@ async function pauseAndAnalyze(tabId: number, redirectUrl: string) {
 
   try {
     console.log("⏸️ Redirect paused - awaiting Leon's Scanner Analysis");
-    await wait(5000); // This is a spinner to just temp pause everthing, allows me to see whats happening when.
+    // await wait(5000); // This is a spinner to just temp pause everthing
 
     // Show loading page
     const loadingUrl = chrome.runtime.getURL("loading.html") + 
