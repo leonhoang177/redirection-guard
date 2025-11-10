@@ -142,10 +142,10 @@ function drainWaitlistRecords(): InputRecord[] {
     const raw = fs.readFileSync(WAITLIST_CSV_PATH, "utf-8");
     const records = parseCsvRecords(raw, "waitlist");
     try {
-      fs.unlinkSync(WAITLIST_CSV_PATH);
+      fs.writeFileSync(WAITLIST_CSV_PATH, "", "utf-8");
     } catch (err: any) {
       console.error(
-        `Failed to clear ${WAITLIST_CSV_PATH}:`,
+        `Failed to reset ${WAITLIST_CSV_PATH}:`,
         err?.message || String(err)
       );
     }
@@ -225,7 +225,10 @@ async function processRecords(
   records: InputRecord[],
   instruction: string,
   outputPath: string
-): Promise<{ quotaHit: boolean }> {
+): Promise<{ quotaHit: boolean; allWaitlisted: boolean }> {
+  let waitlistedCount = 0;
+  let handledResult = false;
+
   for (let index = 0; index < records.length; index++) {
     const record = records[index];
     console.log(`\n=== Processing ID ${record.order} ===`);
@@ -240,6 +243,7 @@ async function processRecords(
       });
 
       if (result.status === "success") {
+        handledResult = true;
         const prompt = formatPrompt(result.data, instruction);
 
         if (prompt === null) {
@@ -262,9 +266,11 @@ async function processRecords(
         );
         console.log(`Saved result for ID ${record.order}`);
       } else if (result.status === "waitlist") {
+        waitlistedCount++;
         appendRecordToWaitlist(record, result.note);
         console.log(`ID ${record.order} added to waitlist.`);
       } else {
+        handledResult = true;
         console.error(`Error scanning ID ${record.order}: ${result.error}`);
         if (isQuotaOrForbiddenError(result.error)) {
           appendRecordToWaitlist(record, "pending (quota)");
@@ -278,6 +284,7 @@ async function processRecords(
       }
     } catch (err: any) {
       const message = err?.message || String(err);
+      handledResult = true;
       console.error(`Unexpected failure for ID ${record.order}: ${message}`);
       if (isQuotaOrForbiddenError(message)) {
         appendRecordToWaitlist(record, "pending (quota)");
@@ -287,7 +294,8 @@ async function processRecords(
     }
   }
 
-  return { quotaHit: false };
+  const allWaitlisted = waitlistedCount > 0 && waitlistedCount === records.length;
+  return { quotaHit: false, allWaitlisted: allWaitlisted && !handledResult };
 }
 
 async function runBatch() {
@@ -316,7 +324,7 @@ async function runBatch() {
     console.log(
       `\n--- Batch iteration ${iteration} (${currentRecords.length} URLs) ---`
     );
-    const { quotaHit } = await processRecords(
+    const { quotaHit, allWaitlisted } = await processRecords(
       currentRecords,
       instruction,
       outputPath
@@ -324,6 +332,13 @@ async function runBatch() {
     if (quotaHit) {
       console.warn(
         "Stopping batch scanning because of quota or unexpected error. Waitlist preserved for retry."
+      );
+      return;
+    }
+
+    if (allWaitlisted) {
+      console.warn(
+        "Every URL in this batch is still waiting on VirusTotal results. Exiting so you can retry later once scans finish."
       );
       return;
     }
