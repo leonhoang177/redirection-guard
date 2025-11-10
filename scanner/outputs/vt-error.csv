@@ -1,2 +1,3 @@
-order,url,label
-2767,https://vigorito.com.br,legit
+order,url,label,set
+2767,https://vigorito.com.br,legit,train
+5403,http://myguichet-service.help/1.sh,phish,train
