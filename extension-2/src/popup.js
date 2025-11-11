@@ -2,8 +2,8 @@ const PROMPT = "INSTRUCT: Cyber Security Analyst. Classify: 'phish' or 'legit'.:
 const triggerButton = document.getElementById("triggerButton");
 const statusDiv = document.getElementById("status");
 triggerButton.addEventListener("click", () => {
-    statusDiv.textContent = "Preparing hardcoded content for LLM...";
-    triggerButton.disabled = true;
+    statusDiv.textContent = "Preparing content...";
+    triggerButton.disabled = false;
     chrome.runtime.sendMessage({
         action: "process_file_content",
         prompt: PROMPT,
