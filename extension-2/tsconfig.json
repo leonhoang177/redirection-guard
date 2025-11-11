@@ -1,13 +1,17 @@
-// tsconfig.json (Simplified for extensions)
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "outDir": "./src" /* Output compiled JS files to the same src directory */,
     "strict": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "outDir": "dist" // Output compiled JS files here
+    "forceConsistentCasingInFileNames": true,
+    "noEmitOnError": true,
+    "lib": ["WebWorker", "DOM", "ES2020"] /* <--- ADDED "DOM" HERE */,
+    "moduleResolution": "node",
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts"] // Source files will be in a 'src' directory
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
 }
