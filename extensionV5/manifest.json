@@ -7,7 +7,18 @@
     "service_worker": "dist/background.js",
     "type": "module"
   },
-  "permissions": ["activeTab", "storage", "webNavigation", "tabs", "alarms"],
+  "permissions": [
+    "identity",
+    "activeTab",
+    "storage",
+    "webNavigation",
+    "tabs",
+    "alarms"
+  ],
+  "oauth2": {
+    "client_id": "377092718801-8t3h7kfcv51bge2j8ul3k6urhgr1h4dt.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/cloud-platform"]
+  },
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",

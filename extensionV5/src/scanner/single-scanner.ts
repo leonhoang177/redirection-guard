@@ -2,12 +2,11 @@
 
 // --- Environment Variable Access ---
 const SCANNER_API_ENDPOINT: string = process.env.SCANNER_API_ENDPOINT as string;
-const API_KEY: string = process.env.API_KEY as string; 
+const API_KEY: string = process.env.API_KEY as string;
 // The two lines below were in your original file's ENV block. Keeping them for safety.
 const VT_API_KEYS = (process.env.VT_API_KEYS || "").trim();
 const VT_API_KEY = (process.env.VT_API_KEY || "").trim();
 // --- End Environment Variable Access ---
-
 
 // Debug flag and logger
 // Note: process.argv is only available in Node.js, remove or replace if needed elsewhere.
@@ -243,13 +242,16 @@ export function appendToWaitlist(
 ) {
   // In a browser extension, you would use chrome.storage or skip this entirely.
   // We'll log a warning instead of trying to write a file.
-  console.warn(`[Waitlist] ${context?.order || ''} URL: ${url} Note: ${note || 'N/A'}`);
+  console.warn(
+    `[Waitlist] ${context?.order || ""} URL: ${url} Note: ${note || "N/A"}`
+  );
 }
 
 function appendToErrorLog(url: string, error: string, context?: ScanContext) {
-  console.error(`[Error Log] ${context?.order || ''} URL: ${url} Error: ${error}`);
+  console.error(
+    `[Error Log] ${context?.order || ""} URL: ${url} Error: ${error}`
+  );
 }
-
 
 // ====== API CONFIG ======
 const BASE = "https://www.virustotal.com/api/v3";
@@ -274,7 +276,8 @@ function parseApiKeys(): string[] {
 
 const API_KEYS = parseApiKeys();
 
-if (API_KEYS.length === 0 && !process.env.IS_EXTENSION) { // Added conditional check
+if (API_KEYS.length === 0 && !process.env.IS_EXTENSION) {
+  // Added conditional check
   console.error(
     "Missing VT_API_KEY(S). Provide VT_API_KEY or VT_API_KEYS env vars."
   );
@@ -1524,27 +1527,21 @@ export async function scanUrl(
   }
 }
 
-// === MODIFIED runScanner for console output ===
-export async function runScanner(urlArg?: string) {
-  // Use the urlArg passed from the extension environment, or a hardcoded default.
-  // We no longer rely on process.argv, which isn't available in service workers.
+export async function runScanner(urlArg?: string): Promise<string | null> {
   const target = urlArg ?? HARDCODED_URL;
   const result = await scanUrl(target, { rawUrl: target });
 
   if (result.status === "waitlist") {
     console.log("URL added to waitlist; no output generated yet.");
-    return;
+    return null;
   }
   if (result.status === "error") {
     console.error("Scan failed:", result.error);
-    // Removed: process.exitCode = 1;
-    return;
+    return null;
   }
 
   const flattenedOutput = result.data;
   const promptOutput = formatPrompt(flattenedOutput, INSTRUCTION || "");
 
-  if (promptOutput !== null) {
-    console.log(`\n\n===========================\n${promptOutput}\n===========================\n`);
-  }
+  return promptOutput;
 }

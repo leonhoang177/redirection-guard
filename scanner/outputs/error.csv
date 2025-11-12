@@ -1,2 +1,2 @@
 order,url,label,error
-2882,https://0123tt.ru,legit,"VirusTotal quota exhausted across all API keys. Last response GET /urls/aHR0cHM6Ly8wMTIzdHQucnU -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
+3670,https://allstate.com,legit,"VirusTotal quota exhausted across all API keys. Last response GET /urls/aHR0cHM6Ly9hbGxzdGF0ZS5jb20 -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
