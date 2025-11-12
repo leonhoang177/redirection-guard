@@ -285,7 +285,7 @@ async function pauseToAnalyze(tabId: number, redirectURL: string) {
   }
 }
 
-async function analyze(tabId: number, redirectURL: string) {
+async function analyze(tabId: number | null, redirectURL: string) {
   // Call VT to scan the URL
   let promptText: string | null = null;
   try {
@@ -403,6 +403,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     console.log(`🔥 Manual analysis result received for ${url}: ${verdict}`);
     takeAction(tabId, url, verdict);
     sendResponse({ success: true });
+  } else if (msg.type === "analyzeUrl") {
+    const { url } = msg;
+    (async () => {
+      try {
+        const verdict = await analyze(null, url);
+        if (!verdict) {
+          sendResponse({
+            success: false,
+            error: "AI did not return a verdict.",
+          });
+          return;
+        }
+        sendResponse({ success: true, verdict });
+      } catch (error) {
+        console.error("Popup analyze request failed:", error);
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    })();
+    return true;
   } else if (msg.type === "requestAnalysis") {
     // EXTERNAL SCRIPT REQUESTING URL TO ANALYZE
     sendResponse({ success: true });

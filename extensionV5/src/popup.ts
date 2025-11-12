@@ -1,15 +1,31 @@
+interface BackgroundAnalysisResponse {
+  success: boolean;
+  verdict?: string;
+  error?: string;
+}
+
 // DOM Elements
 const urlInput = document.getElementById("urlInput") as HTMLInputElement;
 const scanBtn = document.getElementById("scanBtn") as HTMLButtonElement;
-const scanCurrentBtn = document.getElementById("scanCurrentBtn") as HTMLButtonElement;
+const scanCurrentBtn = document.getElementById(
+  "scanCurrentBtn"
+) as HTMLButtonElement;
 const loader = document.getElementById("loader") as HTMLDivElement;
 const statusDiv = document.getElementById("status") as HTMLDivElement;
 const results = document.getElementById("results") as HTMLDivElement;
-const verdictDisplay = document.getElementById("verdictDisplay") as HTMLDivElement;
-const detailedResults = document.getElementById("detailedResults") as HTMLDivElement;
-const extensionStatus = document.getElementById("extensionStatus") as HTMLSpanElement;
+const verdictDisplay = document.getElementById(
+  "verdictDisplay"
+) as HTMLDivElement;
+const detailedResults = document.getElementById(
+  "detailedResults"
+) as HTMLDivElement;
+const extensionStatus = document.getElementById(
+  "extensionStatus"
+) as HTMLSpanElement;
 const cachedCount = document.getElementById("cachedCount") as HTMLSpanElement;
-const protectedCount = document.getElementById("protectedCount") as HTMLSpanElement;
+const protectedCount = document.getElementById(
+  "protectedCount"
+) as HTMLSpanElement;
 
 let showDetailedResults = false;
 
@@ -36,38 +52,48 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // Scan URL
 scanBtn.addEventListener("click", async () => {
+  console.log("Clicked Analyze URL");
   const url = urlInput.value.trim();
-
   if (!url) {
     showStatus("Please enter a URL", "error");
     return;
   }
 
   if (!isValidUrl(url)) {
-    showStatus("Please enter a valid URL (include http:// or https://)", "error");
+    showStatus(
+      "Please enter a valid URL (include http:// or https://)",
+      "error"
+    );
     return;
   }
 
-  await scanUrl(url);
+  await scanURL(url);
 });
 
 // Scan Current Tab
 scanCurrentBtn.addEventListener("click", async () => {
+  console.log("Clicked Analyze Current URL");
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
 
     if (!tab.url) {
       showStatus("Cannot access current tab URL", "error");
       return;
     }
 
-    if (tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://")) {
+    if (
+      tab.url.startsWith("chrome://") ||
+      tab.url.startsWith("chrome-extension://")
+    ) {
       showStatus("Cannot scan Chrome internal pages", "error");
       return;
     }
 
     urlInput.value = tab.url;
-    await scanUrl(tab.url);
+    await scanURL(tab.url);
   } catch (error) {
     showStatus("Error accessing current tab", "error");
     console.error(error);
@@ -75,21 +101,34 @@ scanCurrentBtn.addEventListener("click", async () => {
 });
 
 // Scan URL Function (using local heuristics)
-async function scanUrl(url: string): Promise<void> {
+async function scanURL(url: string): Promise<void> {
   showLoader(true);
   showStatus("🔎 Analyzing URL for suspicious patterns...", "info");
   results.style.display = "none";
 
   try {
     // Get analysis from background script
-    const analysis = await chrome.runtime.sendMessage({ type: "analyzeUrl", url });
-    
-    if (!analysis) {
-      throw new Error("Failed to analyze URL");
+    const analysis = (await chrome.runtime.sendMessage({
+      type: "analyzeUrl",
+      url,
+    })) as BackgroundAnalysisResponse;
+
+    if (!analysis || !analysis.success || !analysis.verdict) {
+      throw new Error(
+        analysis?.error ?? "Failed to analyze URL: No verdict returned."
+      );
     }
 
-    displayResults(url, analysis);
-    showStatus("✅ Scan completed!", "success");
+    console.log("analysis: ", analysis);
+
+    displayResults(url, {
+      verdict: analysis.verdict,
+      reasons: [`Vertex AI final verdict: ${analysis.verdict.toUpperCase()}`],
+    });
+    showStatus(
+      `✅ Scan completed! Verdict: ${analysis.verdict.toUpperCase()}`,
+      "success"
+    );
   } catch (error: any) {
     showStatus(`Error: ${error.message}`, "error");
     console.error("Scan error:", error);
@@ -99,10 +138,13 @@ async function scanUrl(url: string): Promise<void> {
 }
 
 // Display Results
-function displayResults(url: string, analysis: { verdict: string; reasons: string[] }): void {
+function displayResults(
+  url: string,
+  analysis: { verdict: string; reasons: string[] }
+): void {
   const { verdict, reasons } = analysis;
   const verdictClass = getVerdictClass(verdict.toUpperCase());
-  
+
   // Show simple verdict prominently
   verdictDisplay.innerHTML = `
     <div class="verdict-icon">${getVerdictIcon(verdict.toUpperCase())}</div>
@@ -123,11 +165,15 @@ function displayResults(url: string, analysis: { verdict: string; reasons: strin
   detailedResults.innerHTML = `
     <div class="result-section">
       <h3>🔍 Analysis Details</h3>
-      ${reasons.map(reason => `
+      ${reasons
+        .map(
+          (reason) => `
         <div class="result-item">
           • ${reason}
         </div>
-      `).join('')}
+      `
+        )
+        .join("")}
     </div>
 
     <div class="result-section">
@@ -142,7 +188,7 @@ function displayResults(url: string, analysis: { verdict: string; reasons: strin
       </div>
       <div class="result-item">
         <span class="result-label">Path:</span>
-        <span class="result-value">${urlObj.pathname || '/'}</span>
+        <span class="result-value">${urlObj.pathname || "/"}</span>
       </div>
     </div>
 
@@ -150,11 +196,17 @@ function displayResults(url: string, analysis: { verdict: string; reasons: strin
       <h3>🔒 Security Checks</h3>
       <div class="result-item">
         <span class="result-label">HTTPS:</span>
-        <span class="result-value">${url.startsWith('https') ? '✅ Yes' : '❌ No'}</span>
+        <span class="result-value">${
+          url.startsWith("https") ? "✅ Yes" : "❌ No"
+        }</span>
       </div>
       <div class="result-item">
         <span class="result-label">IP Address:</span>
-        <span class="result-value">${/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(urlObj.hostname) ? '⚠️ Yes' : '✅ No'}</span>
+        <span class="result-value">${
+          /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(urlObj.hostname)
+            ? "⚠️ Yes"
+            : "✅ No"
+        }</span>
       </div>
       <div class="result-item">
         <span class="result-label">Analysis Method:</span>
@@ -164,21 +216,25 @@ function displayResults(url: string, analysis: { verdict: string; reasons: strin
   `;
 
   // Show/hide toggle for detailed results
-  const toggleButton = document.createElement('button');
-  toggleButton.textContent = showDetailedResults ? 'Hide Details' : 'Show Details';
-  toggleButton.className = 'secondary-btn';
+  const toggleButton = document.createElement("button");
+  toggleButton.textContent = showDetailedResults
+    ? "Hide Details"
+    : "Show Details";
+  toggleButton.className = "secondary-btn";
   toggleButton.onclick = () => {
     showDetailedResults = !showDetailedResults;
-    detailedResults.style.display = showDetailedResults ? 'block' : 'none';
-    toggleButton.textContent = showDetailedResults ? 'Hide Details' : 'Show Details';
+    detailedResults.style.display = showDetailedResults ? "block" : "none";
+    toggleButton.textContent = showDetailedResults
+      ? "Hide Details"
+      : "Show Details";
   };
 
-  results.innerHTML = '';
+  results.innerHTML = "";
   results.appendChild(verdictDisplay);
   results.appendChild(toggleButton);
   results.appendChild(detailedResults);
-  
-  detailedResults.style.display = showDetailedResults ? 'block' : 'none';
+
+  detailedResults.style.display = showDetailedResults ? "block" : "none";
   results.style.display = "block";
 
   // Update stats
@@ -255,8 +311,8 @@ function isValidUrl(url: string): boolean {
 }
 
 // Add keyboard shortcut for current tab
-document.addEventListener('keydown', (e) => {
-  if (e.ctrlKey && e.key === 'Enter') {
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.key === "Enter") {
     scanCurrentBtn.click();
   }
 });
