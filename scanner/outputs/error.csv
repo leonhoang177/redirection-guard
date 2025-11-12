@@ -1,0 +1,2 @@
+order,url,label,error
+2094,https://mgts.ru,legit,"VirusTotal quota exhausted across all API keys. Last response GET /urls/aHR0cHM6Ly9tZ3RzLnJ1 -> 429: {""error"": {""code"": ""QuotaExceededError"", ""message"": ""Quota exceeded""}}"
