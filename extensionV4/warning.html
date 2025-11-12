@@ -208,6 +208,25 @@
       font-weight: 500;
       margin-bottom: 16px;
     }
+    /* Add this new style */
+    .minor-button-group {
+      margin-top: 16px; /* Space it out from the main buttons */
+    }
+
+    .btn-link {
+      background: none;
+      color: #5cb85c;
+      font-size: 14px;
+      padding: 8px 16px;
+      min-width: unset; /* Allow button to shrink */
+      text-decoration: underline;
+    }
+
+    .btn-link:hover {
+      color: #2d5016;
+      box-shadow: none;
+      transform: none;
+    }
   </style>
 </head>
 <body>
@@ -242,7 +261,6 @@
         <li>The redirect pattern appears suspicious</li>
       </ul>
     </div>
-
     <div class="button-group">
       <button class="btn-primary" id="returnButton">
         ← Go Back to Safety
@@ -252,6 +270,11 @@
       </button>
     </div>
 
+    <div class="minor-button-group">
+      <button class="btn-link" id="googleBtn">
+        Or search Google instead
+      </button>
+    </div>
     <div class="footer">
       Protected by Redirect Guard Extension v2.0
     </div>

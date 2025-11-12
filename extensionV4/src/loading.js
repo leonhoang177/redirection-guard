@@ -62,15 +62,23 @@ document.getElementById('unsafeBtn').addEventListener('click', () => {
   // Stop status updates
   clearInterval(statusInterval);
   
-  // Send "malicious" verdict to background script
+  // 1. Send "malicious" verdict to background script. 
+  // This notifies background.js to update its internal state for the URL/tab.
   chrome.runtime.sendMessage({
     type: "analysisResult",
     url: scannedUrl,
     tabId: currentTabId,
-    verdict: "malicious"
+    verdict: "phish"
   });
 
-  // Update UI
+  // 2. CRITICAL FIX: Immediately navigate the current tab to the warning page.
+  // This bypasses the delayed/erroneous navigation logic in background.js
+  // and protects the user immediately.
+  const warningUrl = chrome.runtime.getURL(`warning.html?url=${encodeURIComponent(scannedUrl)}&verdict=phish`);
+  window.location.href = warningUrl;
+
+  // The UI update below is now mostly redundant since we navigate away instantly, 
+  // but it's okay to keep for a split-second visual confirmation.
   document.querySelector('.container').innerHTML = `
     <div class="icon">🚨</div>
     <h1 style="color: #721c24;">Blocking Redirect</h1>

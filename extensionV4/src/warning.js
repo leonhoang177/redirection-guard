@@ -27,12 +27,12 @@
 
   // Update verdict badge
   const verdictBadge = document.getElementById('verdictBadge');
-  if (verdict === 'malicious') {
+  if (verdict === 'phish') {
     verdictBadge.textContent = '🚨 MALICIOUS';
-    verdictBadge.className = 'verdict-badge verdict-malicious';
-  } else if (verdict === 'suspicious') {
-    verdictBadge.textContent = '⚠️ SUSPICIOUS';
-    verdictBadge.className = 'verdict-badge verdict-suspicious';
+    verdictBadge.className = 'verdict-badge verdict-phish';
+  } else if (verdict === 'legit') {
+    verdictBadge.textContent = ':3 legit';
+    verdictBadge.className = 'verdict-badge verdict-legit';
   } else {
     verdictBadge.textContent = '❓ UNKNOWN';
     verdictBadge.className = 'verdict-badge verdict-unknown';
@@ -40,32 +40,26 @@
 
   // Update warning reasons based on verdict
   const reasons = document.getElementById('warningReasons');
-  if (verdict === 'malicious') {
-    reasons.innerHTML = `
-      <li>Multiple security engines flagged this as MALICIOUS</li>
-      <li>This site is known for phishing or malware distribution</li>
-      <li>Proceeding will expose you to significant security risks</li>
-    `;
-  } else if (verdict === 'suspicious') {
-    reasons.innerHTML = `
-      <li>Some security engines flagged this as suspicious</li>
-      <li>The redirect pattern exhibits unusual behavior</li>
-      <li>Exercise extreme caution if you proceed</li>
-    `;
-  } else {
-    reasons.innerHTML = `
-      <li>This URL has not been analyzed yet</li>
-      <li>We cannot verify if this redirect is safe</li>
-      <li>The destination may pose unknown risks</li>
-    `;
+  reasons.innerHTML = `
+    <li>Multiple security engines flagged this as MALICIOUS</li>
+    <li>This site is known for phishing or malware distribution</li>
+    <li>Proceeding will expose you to significant security risks</li>
+  `;
+
+  function goToGoogle() {
+    window.location.href = 'https://www.google.com';
   }
 
   function goBack() {
-    // Try to go back in history, or close tab if possible
-    if (window.history.length > 1) {
-      window.history.back();
+    // Check if history is long enough to contain the Original Site (N-2), 
+    // the Loading Page (N-1), and the Warning Page (N).
+    // A length of 3 or more allows a safe jump back of 2.
+    if (window.history.length > 3) {
+      // Go back two steps to skip the loading.html page
+      window.history.go(-3);
     } else {
-      // If no history, try to navigate to a safe page
+      // If history is too short (length is 1 or 2), 
+      // we cannot reliably go back 2 steps. Navigate to a safe default page instead.
       window.location.href = 'https://www.google.com';
     }
   }
@@ -106,12 +100,14 @@ Click "OK" to proceed or "Cancel" to go back to safety.`;
   }
 }
 
+
   document.addEventListener('DOMContentLoaded', () => {
     
     // 1. Attach the goBack function to the return button
     const returnButton = document.getElementById('returnButton');
     if (returnButton) {
-      returnButton.addEventListener('click', goBack);
+      // Note: ensure your goBack function is the updated one that uses go(-2)
+      returnButton.addEventListener('click', goBack); 
     } else {
       console.error("CSP Fix: Return button element (#returnButton) not found.");
     }
@@ -122,5 +118,13 @@ Click "OK" to proceed or "Cancel" to go back to safety.`;
       continueButton.addEventListener('click', proceedAnyway);
     } else {
       console.error("CSP Fix: Continue button element (#continueButton) not found.");
+    }
+    
+    // 3. Attach the goToGoogle function to the new Google button
+    const googleBtn = document.getElementById('googleBtn');
+    if (googleBtn) {
+      googleBtn.addEventListener('click', goToGoogle);
+    } else {
+      console.error("CSP Fix: Google button element (#googleBtn) not found.");
     }
   });

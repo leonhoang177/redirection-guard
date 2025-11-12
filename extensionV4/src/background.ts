@@ -182,17 +182,15 @@ async function pauseAndAnalyze(tabId: number, redirectUrl: string) {
   await runScanner(redirectUrl);
 
 
-  let verdict = "";
-
-  console.log("Ai is thinking (implament here. Ln187 - backgroung.ts)...");
-  await wait(8000);
+  let verdict = "phish";
   /*
 
     AI CALL GOES HERE, STORE FINAL VERDIT IN STRING FOR COMP
 
   */
 
-
+  console.log("Ai is thinking (implament here. Ln187 - backgroung.ts)...");
+  await wait(8000);
 
   if (verdict !== "legit" && verdict !== "phish") {
     verdict = "unknown";
@@ -209,10 +207,10 @@ async function handleVerdict(tabId: number, url: string, verdict: string) {
   console.log(`📊 VERDICT RECEIVED: ${url} → ${verdict}`);
   
   if (verdict === "phish") {
-    console.log("🚫 phish: blocking");
+    console.log("🚫 : blocking");
     await blockAndWarn(tabId, url, verdict);
   } else if (verdict === "legit") {
-    console.log("✅ legit: send it");
+    console.log("✅ : send it");
     allowedUrls.add(url);
     // Safe - allow the redirect to continue
     await chrome.tabs.update(tabId, { url: url });
