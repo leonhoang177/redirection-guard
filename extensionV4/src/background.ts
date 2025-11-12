@@ -165,9 +165,13 @@ chrome.webNavigation.onCompleted.addListener((details) => {
   }
 });
 
+async function wait(ms: number){
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Pause navigation and send to scanner analysis
 async function pauseAndAnalyze(tabId: number, redirectUrl: string) {
-  console.log("⏸️ Redirect paused - awaiting Scanner Analysis");
+  console.log("--Redirect paused--");
 
   // Show loading page
   const loadingUrl = chrome.runtime.getURL("loading.html") + 
@@ -180,6 +184,8 @@ async function pauseAndAnalyze(tabId: number, redirectUrl: string) {
 
   let verdict = "";
 
+  console.log("Ai is thinking (implament here. Ln187 - backgroung.ts)...");
+  await wait(8000);
   /*
 
     AI CALL GOES HERE, STORE FINAL VERDIT IN STRING FOR COMP
@@ -188,11 +194,7 @@ async function pauseAndAnalyze(tabId: number, redirectUrl: string) {
 
 
 
-  if (verdict === "legit") {
-    verdict = "legit";
-  } else if (verdict === "malicious") {
-    verdict = "malicious";
-  } else {
+  if (verdict !== "legit" && verdict !== "phish") {
     verdict = "unknown";
   }
 
@@ -215,9 +217,9 @@ async function handleVerdict(tabId: number, url: string, verdict: string) {
     // Safe - allow the redirect to continue
     await chrome.tabs.update(tabId, { url: url });
   } else {
-
     //TODO Add some sorta shit here to handle errors
     console.log("UNKNOWN RETURN VALUE FROM THE AI");
+    console.log("Attackers win by default I guess!");
     allowedUrls.add(url);
     await chrome.tabs.update(tabId, { url: url });
   }
@@ -242,21 +244,21 @@ async function blockAndWarn(tabId: number, url: string, verdict: string) {
       }
     });
     
-    console.log(`🛡️ Blocked ${verdict} redirect and showed warning`);
+    console.log(`Blocked ${verdict} redirect and showed warning`);
   } catch (error) {
-    console.error("❌ Error blocking navigation:", error);
+    console.error("Error blocking navigation:", error);
   }
 }
 
 // Message handler
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg === "ping") {
-    console.log("📩 Received ping from popup");
+    console.log("Received ping from popup");
     sendResponse("pong");
   } else if (msg.type === "allowUrl") {
     // User chose to proceed to blocked URL
     const { url, tabId } = msg;
-    console.log(`🔓 User allowing URL: ${url}`);
+    console.log(`User allowing URL: ${url}`);
     allowedUrls.add(url);
     chrome.tabs.update(tabId, { url });
     sendResponse({ success: true });

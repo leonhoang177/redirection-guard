@@ -24,11 +24,6 @@ function isForbidden(err: any): boolean {
 // VirusTotal API Response Types
 import { VTURLMetadata, VTDomainResponse, VTIPResponse } from "./type";
 
-// ===== Helper Functions =====
-// Removed: import fs from "fs";
-// Removed: import path from "path";
-// Removed: import { pathToFileURL } from "url"; 
-
 import { getDomain as tldGetDomain } from "tldts";
 
 export interface ScanContext {
