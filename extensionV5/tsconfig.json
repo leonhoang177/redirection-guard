@@ -9,7 +9,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "bundler",  // Changed from "node"
+    "moduleResolution": "bundler", // Changed from "node"
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
@@ -17,11 +17,6 @@
     "removeComments": true,
     "types": ["node", "chrome"]
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["src/**/*", "dist/loading.js", "dist/warning.js"],
+  "exclude": ["node_modules", "dist"]
 }

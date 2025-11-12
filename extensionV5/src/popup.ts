@@ -22,20 +22,13 @@ const detailedResults = document.getElementById(
 const extensionStatus = document.getElementById(
   "extensionStatus"
 ) as HTMLSpanElement;
-const cachedCount = document.getElementById("cachedCount") as HTMLSpanElement;
-const protectedCount = document.getElementById(
-  "protectedCount"
-) as HTMLSpanElement;
 
 let showDetailedResults = false;
 let statusHideTimeoutId: number | null = null;
 
 // Initialize
 document.addEventListener("DOMContentLoaded", async () => {
-  showStatus("✅ Redirect Guard ready", "success");
-
-  // Load extension stats
-  await updateStats();
+  showStatus("🚀 Redirect Guard is ready", "success");
 
   // Test background script connection
   try {
@@ -55,13 +48,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 scanBtn.addEventListener("click", async () => {
   const url = urlInput.value.trim();
   if (!url) {
-    showStatus("Please enter a URL", "error");
+    showStatus("👉 Please enter an URL", "error");
     return;
   }
 
   if (!isValidUrl(url)) {
     showStatus(
-      "Please enter a valid URL (starts with http:// or https://)",
+      "👉 Please enter a valid URL (starts with http:// or https://)",
       "error"
     );
     return;
@@ -87,14 +80,14 @@ scanCurrentBtn.addEventListener("click", async () => {
       tab.url.startsWith("chrome://") ||
       tab.url.startsWith("chrome-extension://")
     ) {
-      showStatus("Cannot scan Chrome internal pages", "error");
+      showStatus("🚨 Failed to scan Chrome internal pages", "error");
       return;
     }
 
     urlInput.value = tab.url;
     await analyzeURL(tab.url);
   } catch (error) {
-    showStatus("Error accessing current tab", "error");
+    showStatus("🚩 Error accessing current tab", "error");
     console.error(error);
   }
 });
@@ -130,25 +123,19 @@ async function analyzeURL(url: string): Promise<void> {
         }
 
         showStatus(
-          "Encounter a new URL: We need more time to scan...",
+          "💡 Encounter a new URL: We need more time to scan...",
           "info",
-          10_000
+          20_000
         );
-        await delay(10_000);
+        await delay(20_000);
       }
     } while (analysis?.verdict === "waitlist");
-
-    console.log("analysis: ", analysis);
 
     displayResults(url, {
       verdict: analysis.verdict,
       reasons: [`Vertex AI final verdict: ${analysis.verdict.toUpperCase()}`],
     });
-    showStatus(
-      `✅ Scan completed! Verdict: ${analysis.verdict.toUpperCase()}`,
-      "success",
-      3_000
-    );
+    showStatus(`✅ Scan completed!`, "success", 3_000);
   } catch (error: any) {
     showStatus(`Error: ${error.message}`, "error");
     console.error("Scan error:", error);
@@ -231,9 +218,6 @@ function displayResults(
 
   detailedResults.style.display = showDetailedResults ? "block" : "none";
   results.style.display = "block";
-
-  // Update stats
-  updateStats();
 }
 
 // Get Verdict CSS Class
@@ -257,19 +241,6 @@ function getVerdictIcon(verdict: string): string {
       return "⚠️";
     default:
       return "❓";
-  }
-}
-
-// Update Extension Stats
-async function updateStats(): Promise<void> {
-  try {
-    const stats = await chrome.runtime.sendMessage({ type: "getStats" });
-    if (stats) {
-      cachedCount.textContent = stats.cached || "0";
-      protectedCount.textContent = stats.trusted || "0";
-    }
-  } catch (error) {
-    console.log("Could not load stats:", error);
   }
 }
 

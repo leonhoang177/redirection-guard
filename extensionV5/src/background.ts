@@ -395,12 +395,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     allowedUrls.add(url);
     chrome.tabs.update(tabId, { url });
     sendResponse({ success: true });
-  } else if (msg.type === "getStats") {
-    // Return some stats for the popup
-    sendResponse({
-      active: activeNavigations.size,
-      trusted: safeOrigins.size,
-    });
   } else if (msg.type === "analysisResult") {
     // Manual analysis result from loading page buttons
     const { url, tabId, verdict } = msg;
