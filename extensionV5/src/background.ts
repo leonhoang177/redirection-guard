@@ -272,7 +272,14 @@ async function pauseToAnalyze(tabId: number, redirectURL: string) {
   }
 
   try {
-    await analyze(tabId, redirectURL);
+    const verdict = await analyze(tabId, redirectURL);
+    if (!!verdict) {
+      try {
+        await takeAction(tabId, redirectURL, verdict);
+      } catch (error) {
+        console.error("Failed to call takeAction (after analyze):", error);
+      }
+    }
   } catch (error) {
     console.error("Failed to analyze (after pausing):", error);
   }
@@ -309,12 +316,9 @@ async function analyze(tabId: number, redirectURL: string) {
 
   if (!!verdict) {
     console.log(`AI's final verdict: 🔥 ${verdict.toUpperCase()} 🔥`);
-    try {
-      await takeAction(tabId, redirectURL, verdict);
-    } catch (error) {
-      console.error("Failed to call takeAction (after the verdict):", error);
-    }
   }
+
+  return verdict ?? null;
 }
 
 // Take action based on the verdict
