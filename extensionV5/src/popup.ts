@@ -126,9 +126,9 @@ async function analyzeURL(url: string): Promise<void> {
         showStatus(
           "💡 Encounter a new URL: We need more time to scan...",
           "info",
-          20_000
+          12000
         );
-        await delay(20_000);
+        await delay(12000);
       }
     } while (analysis?.verdict === "waitlist");
 
@@ -221,7 +221,10 @@ function getVerdictIcon(verdict: string): string {
   }
 }
 
-function formatJsonDetails(jsonOutput: string | undefined, fallbackUrl: string) {
+function formatJsonDetails(
+  jsonOutput: string | undefined,
+  fallbackUrl: string
+) {
   if (!jsonOutput) {
     return `
       <div class="result-item">
