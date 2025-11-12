@@ -5,16 +5,6 @@ const scannedUrl = params.get('url') || 'Unknown URL';
 // Display the URL being scanned
 document.getElementById('urlDisplay').textContent = scannedUrl;
 
-// Show redirect information if available
-// if (originalUrl && originalUrl !== scannedUrl) {
-//   const redirectInfo = document.getElementById('redirectInfo');
-//   const redirectFrom = document.getElementById('redirectFrom');
-//   const redirectTo = document.getElementById('redirectTo');
-  
-//   redirectTo.textContent = scannedUrl;
-//   redirectInfo.style.display = 'block';
-// }
-
 // Add some dynamic status updates for better user experience
 const statusMessages = [
   "Doing all of the hard stuff",

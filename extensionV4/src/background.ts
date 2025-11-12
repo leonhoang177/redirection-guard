@@ -1,4 +1,15 @@
+// pnpm add dotenv tldts
+// pnpm add -D @types/node @types/chrome
+// pnpm run build
+
+
 /// <reference types="chrome"/>
+
+// Import the scanner API
+// import { analyzeUrl, ScannerResponse } from './scanner/scanner-api';
+
+// @ts-ignore: importing TS file as JS module
+import { runScanner } from "./scanner/single-scanner.js";
 
 console.log("🟢 Redirect Guard: Background service worker initialized");
 
@@ -141,7 +152,7 @@ chrome.webNavigation.onCommitted.addListener(async (details) => {
       return;
     }
     
-    // PAUSE THE REDIRECT - Send to your analysis script
+    // PAUSE THE REDIRECT - Send to scanner analysis
     await pauseAndAnalyze(tabId, url);
   }
 });
@@ -154,55 +165,59 @@ chrome.webNavigation.onCompleted.addListener((details) => {
   }
 });
 
-/**
- * Creates a non-blocking delay.
- * Usage: await wait(5000); // Waits 5 seconds
- */
-function wait(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Pause navigation and send to external analysis
+// Pause navigation and send to scanner analysis
 async function pauseAndAnalyze(tabId: number, redirectUrl: string) {
+  console.log("⏸️ Redirect paused - awaiting Scanner Analysis");
 
-  try {
-    console.log("⏸️ Redirect paused - awaiting Leon's Scanner Analysis");
-    await wait(5000); // This is a spinner to just temp pause everthing, allows me to see whats happening when.
+  // Show loading page
+  const loadingUrl = chrome.runtime.getURL("loading.html") + 
+    `?url=${encodeURIComponent(redirectUrl)}`;
+  
+  await chrome.tabs.update(tabId, { url: loadingUrl });
 
-    // Show loading page
-    const loadingUrl = chrome.runtime.getURL("loading.html") + 
-      `?url=${encodeURIComponent(redirectUrl)}`;
-    
-    await chrome.tabs.update(tabId, { url: loadingUrl });
+  await runScanner(redirectUrl);
 
-    /*
-    TODO: Add call to Scanner with the information required.
-    get back saftey rating, or some other return
-    */
 
-  } catch (error) {
-    console.error("Error pausing navigation:", error);
+  let verdict = "";
+
+  /*
+
+    AI CALL GOES HERE, STORE FINAL VERDIT IN STRING FOR COMP
+
+  */
+
+
+
+  if (verdict === "legit") {
+    verdict = "legit";
+  } else if (verdict === "malicious") {
+    verdict = "malicious";
+  } else {
+    verdict = "unknown";
   }
+
+  console.log(`📊 AI Result after analyzing ${redirectUrl}: ${verdict}`);
+
+  // Send verdict to be handled
+  await handleVerdict(tabId, redirectUrl, verdict);
 }
 
-// Handle verdict from external analysis
+// Handle verdict from analysis
 async function handleVerdict(tabId: number, url: string, verdict: string) {
   console.log(`📊 VERDICT RECEIVED: ${url} → ${verdict}`);
   
-  if (verdict === "malicious") {
-    console.log("BLOCKING malicious redirect");
+  if (verdict === "phish") {
+    console.log("🚫 phish: blocking");
     await blockAndWarn(tabId, url, verdict);
-  } else if (verdict === "suspicious") {
-    console.log("WARNING about suspicious redirect");
-    await blockAndWarn(tabId, url, verdict);
-  } else if (verdict === "unknown") {
-    console.log("Unknown URL - showing caution warning");
-    await blockAndWarn(tabId, url, verdict);
-  } else {
+  } else if (verdict === "legit") {
+    console.log("✅ legit: send it");
+    allowedUrls.add(url);
     // Safe - allow the redirect to continue
-    console.log("Redirect is SAFE, allowing navigation");
+    await chrome.tabs.update(tabId, { url: url });
+  } else {
 
-    //! Theoretically, we should still get user permission to add this
+    //TODO Add some sorta shit here to handle errors
+    console.log("UNKNOWN RETURN VALUE FROM THE AI");
     allowedUrls.add(url);
     await chrome.tabs.update(tabId, { url: url });
   }
@@ -252,14 +267,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       trusted: safeOrigins.size
     });
   } else if (msg.type === "analysisResult") {
-    // EXTERNAL ANALYSIS RESULT RECEIVED
+    // Manual analysis result from loading page buttons
     const { url, tabId, verdict } = msg;
-    console.log(`📥 External analysis result received for ${url}: ${verdict}`);
+    console.log(`🔥 Manual analysis result received for ${url}: ${verdict}`);
     handleVerdict(tabId, url, verdict);
     sendResponse({ success: true });
   } else if (msg.type === "requestAnalysis") {
     // EXTERNAL SCRIPT REQUESTING URL TO ANALYZE
-    // Your team's script can call this to get the current URL being analyzed
     sendResponse({ success: true });
   }
   return true;
