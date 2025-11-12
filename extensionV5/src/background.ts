@@ -31,46 +31,19 @@ const VERTEX_AI_CONFIG = {
   ENDPOINT_ID: "2748153447323795456",
 } as const;
 
-// Initialize safe domains (popular, trusted sites)
-const TRUSTED_DOMAINS = [
-  "google.com",
-  "gmail.com",
-  "youtube.com",
-  "facebook.com",
-  "twitter.com",
-  "linkedin.com",
-  "microsoft.com",
-  "apple.com",
-  "amazon.com",
-  "github.com",
-  "stackoverflow.com",
-  "reddit.com",
-  "wikipedia.org",
-  "mozilla.org",
-  "instagram.com",
-  "tiktok.com",
-  "netflix.com",
-  "spotify.com",
-];
-
 // Initialize extension
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("✅ Redirect Guard installed");
-
-  // Populate trusted domains
-  TRUSTED_DOMAINS.forEach((domain) => {
-    safeOrigins.add(domain);
-    safeOrigins.add(`www.${domain}`);
-  });
-
+  //console.log("✅ Redirect Guard installed");
   chrome.alarms.create("keepAlive", { periodInMinutes: 4 });
 });
 
 // Keep service worker alive
 chrome.alarms.onAlarm.addListener((alarm) => {
+  /*
   if (alarm.name === "keepAlive") {
     console.log("Background heartbeat...");
   }
+  */
 });
 
 // Helper functions
@@ -84,11 +57,7 @@ function extractDomain(url: string): string {
 
 function isTrustedDomain(url: string): boolean {
   const domain = extractDomain(url);
-  return (
-    safeOrigins.has(domain) ||
-    safeOrigins.has(domain.replace("www.", "")) ||
-    TRUSTED_DOMAINS.some((trusted) => domain.endsWith(trusted))
-  );
+  return safeOrigins.has(domain) || safeOrigins.has(domain.replace("www.", ""));
 }
 
 function isSystemUrl(url: string): boolean {
@@ -282,12 +251,24 @@ async function requestVertexClassification(
 
 function normalizeAiVerdict(rawText: string): "legit" | "phish" | "unknown" {
   const normalized = rawText.trim().toLowerCase();
-  if (normalized.includes("legit")) {
+  const legitSignals = ["legit", "legitimate"];
+  const phishSignals = ["phish", "phishing"];
+
+  const hasLegitSignal = legitSignals.some((signal) =>
+    normalized.includes(signal)
+  );
+  const hasPhishSignal = phishSignals.some((signal) =>
+    normalized.includes(signal)
+  );
+
+  if (hasLegitSignal && !hasPhishSignal) {
     return "legit";
   }
-  if (normalized.includes("phish")) {
+
+  if (hasPhishSignal && !hasLegitSignal) {
     return "phish";
   }
+
   return "unknown";
 }
 
@@ -314,7 +295,7 @@ async function pauseAndAnalyze(tabId: number, redirectURL: string) {
 
   // AI CALL GOES HERE, STORE FINAL VERDIT IN STRING FOR COMP
   console.log("Ai is thinking (implament here. Ln187 - backgroung.ts)...");
-  await wait(8000);
+
   if (promptText) {
     try {
       const aiResponse = await requestVertexClassification(promptText);
