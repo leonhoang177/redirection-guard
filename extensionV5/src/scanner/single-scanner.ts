@@ -306,7 +306,7 @@ function tryRotateApiKey(reason: string): boolean {
   const previous = maskApiKey(API_KEYS[activeApiKeyIndex]);
   activeApiKeyIndex += 1;
   const next = maskApiKey(API_KEYS[activeApiKeyIndex]);
-  console.warn(`Rotating VT API key (${reason}). ${previous} -> ${next}`);
+  //console.warn(`Rotating VT API key (${reason}). ${previous} -> ${next}`);
   return true;
 }
 
@@ -1474,7 +1474,7 @@ export async function scanUrl(
       error: "Invalid URL. Please provide an URL starts with 'http' or 'https'",
     };
   }
-  console.log(`VirusTotal URL scan for: ${describeLogTarget(url, context)}`);
+  console.log(`VirusTotal is scanning: ${describeLogTarget(url, context)}`);
 
   try {
     let urlReport: any | null = null;

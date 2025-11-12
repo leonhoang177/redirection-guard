@@ -287,20 +287,20 @@ async function pauseAndAnalyze(tabId: number, redirectURL: string) {
 
   promptText = await runScanner(redirectURL);
 
-  if (promptText !== null) {
-    console.log(`\n\n\n${promptText}\n\n\n`);
-  }
+  /*if (promptText !== null) {
+    console.log(`\n\n${promptText}\n\n`);
+  }*/
 
-  let verdict = "phish";
+  let verdict = "unknown";
 
-  // AI CALL GOES HERE, STORE FINAL VERDIT IN STRING FOR COMP
-  console.log("Ai is thinking (implament here. Ln187 - backgroung.ts)...");
+  // AI CALL
+  console.log("AI Analyzing...");
 
-  if (promptText) {
+  if (!!promptText) {
     try {
       const aiResponse = await requestVertexClassification(promptText);
       verdict = normalizeAiVerdict(aiResponse);
-      console.log("Vertex AI raw response:", aiResponse);
+      //console.log("Vertex AI raw response:", aiResponse);
     } catch (error) {
       console.error("Vertex AI call failed:", error);
     }
@@ -310,11 +310,7 @@ async function pauseAndAnalyze(tabId: number, redirectURL: string) {
     );
   }
 
-  if (verdict !== "legit" && verdict !== "phish") {
-    verdict = "unknown";
-  }
-
-  console.log(`📊 AI Result after analyzing ${redirectURL}: ${verdict}`);
+  console.log(`⚖️ AI's verdict: ${redirectURL}: ${verdict}`);
 
   // Send verdict to be handled
   await handleVerdict(tabId, redirectURL, verdict);
@@ -322,13 +318,13 @@ async function pauseAndAnalyze(tabId: number, redirectURL: string) {
 
 // Handle verdict from analysis
 async function handleVerdict(tabId: number, url: string, verdict: string) {
-  console.log(`📊 VERDICT RECEIVED: ${url} → ${verdict}`);
+  //console.log(`📊 VERDICT RECEIVED: ${url} → ${verdict}`);
 
   if (verdict === "phish") {
-    console.log("🚫 : blocking");
+    console.log("🚫 Blocked");
     await blockAndWarn(tabId, url, verdict);
   } else if (verdict === "legit") {
-    console.log("✅ : send it");
+    console.log("✅ Allowed");
     allowedUrls.add(url);
     // Safe - allow the redirect to continue
     await chrome.tabs.update(tabId, { url: url });
