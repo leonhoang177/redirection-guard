@@ -156,31 +156,56 @@
       }
 
       .verdict-display {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
         text-align: center;
-        padding: 10px;
+        padding: 20px;
         border-radius: 8px;
-        border: 2px solid;
-        border-color: "black";
         margin-bottom: 20px;
         font-size: 16px;
         font-weight: 600;
-        background-color: "white";
+        border: 2px solid transparent;
       }
 
-      .verdict-legit {
-        color: #009e25;
+      .verdict-display-legit {
+        background: #d4edda;
+        border-color: #5cb85c;
       }
 
-      .verdict-phish {
-        color: #ff0000;
+      .verdict-display-phish {
+        background: #fff3cd;
+        border-color: #ff4a4a;
       }
 
-      .verdict-unknown {
-        color: #002fff;
+      .verdict-display-unknown {
+        background: #f2f2f2;
+        border-color: #8c8c8c;
+      }
+
+      .verdict-banner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      .verdict-icon {
+        font-size: 24px;
+      }
+
+      .verdict-text {
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .verdict-text-legit {
+        color: #155724;
+      }
+
+      .verdict-text-phish {
+        color: #c62828;
+      }
+
+      .verdict-text-unknown {
+        color: #1b4b8c;
       }
 
       .result-section {

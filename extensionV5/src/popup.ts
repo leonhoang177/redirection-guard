@@ -52,7 +52,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // Scan URL
 scanBtn.addEventListener("click", async () => {
-  console.log("Clicked Analyze URL");
   const url = urlInput.value.trim();
   if (!url) {
     showStatus("Please enter a URL", "error");
@@ -61,7 +60,7 @@ scanBtn.addEventListener("click", async () => {
 
   if (!isValidUrl(url)) {
     showStatus(
-      "Please enter a valid URL (include http:// or https://)",
+      "Please enter a valid URL (starts with http:// or https://)",
       "error"
     );
     return;
@@ -72,7 +71,6 @@ scanBtn.addEventListener("click", async () => {
 
 // Scan Current Tab
 scanCurrentBtn.addEventListener("click", async () => {
-  console.log("Clicked Analyze Current URL");
   try {
     const [tab] = await chrome.tabs.query({
       active: true,
@@ -143,15 +141,16 @@ function displayResults(
   analysis: { verdict: string; reasons: string[] }
 ): void {
   const { verdict, reasons } = analysis;
-  const verdictClass = getVerdictClass(verdict.toUpperCase());
+  const verdictLower = verdict.toLowerCase();
+  const verdictUpper = verdict.toUpperCase();
+  const verdictClass = getVerdictClass(verdictLower);
 
   // Show simple verdict prominently
   verdictDisplay.innerHTML = `
-    <div class="verdict-display">
-      <div class="verdict-${verdict}">${verdict.toUpperCase()}</div>
-      <div class="verdict-icon">${getVerdictIcon(verdict)}</div>
+    <div class="verdict-banner">
+      <span class="verdict-text verdict-text-${verdictLower}">${verdictUpper}</span>
+      <span class="verdict-icon">${getVerdictIcon(verdictLower)}</span>
     </div>
-
   `;
   verdictDisplay.className = `verdict-display ${verdictClass}`;
   verdictDisplay.style.display = "block";
@@ -161,42 +160,17 @@ function displayResults(
   try {
     urlObj = new URL(url);
   } catch {
-    urlObj = { hostname: "Invalid URL", protocol: "", pathname: "" };
+    urlObj = { hostname: "Invalid URL" };
   }
 
   // Prepare detailed results
   detailedResults.innerHTML = `
     <div class="result-section">
-      <h3>🔍 Analysis Details</h3>
-      ${reasons
-        .map(
-          (reason) => `
-        <div class="result-item">
-          • ${reason}
-        </div>
-      `
-        )
-        .join("")}
-    </div>
-
-    <div class="result-section">
-      <h3>🌐 URL Information</h3>
+      <h3>🔎 URL Information</h3>
       <div class="result-item">
         <span class="result-label">Domain:</span>
         <span class="result-value">${urlObj.hostname}</span>
       </div>
-      <div class="result-item">
-        <span class="result-label">Protocol:</span>
-        <span class="result-value">${urlObj.protocol}</span>
-      </div>
-      <div class="result-item">
-        <span class="result-label">Path:</span>
-        <span class="result-value">${urlObj.pathname || "/"}</span>
-      </div>
-    </div>
-
-    <div class="result-section">
-      <h3>🔒 Security Checks</h3>
       <div class="result-item">
         <span class="result-label">HTTPS:</span>
         <span class="result-value">${
@@ -210,10 +184,6 @@ function displayResults(
             ? "⚠️ Yes"
             : "✅ No"
         }</span>
-      </div>
-      <div class="result-item">
-        <span class="result-label">Analysis Method:</span>
-        <span class="result-value">Heuristic Pattern Matching</span>
       </div>
     </div>
   `;
@@ -248,11 +218,11 @@ function displayResults(
 function getVerdictClass(verdict: string): string {
   switch (verdict) {
     case "legit":
-      return "verdict-legit";
+      return "verdict-display-legit";
     case "phish":
-      return "verdict-phish";
+      return "verdict-display-phish";
     default:
-      return "verdict-unknown";
+      return "verdict-display-unknown";
   }
 }
 
@@ -281,7 +251,6 @@ async function updateStats(): Promise<void> {
   }
 }
 
-// Helper Functions
 function showStatus(message: string, type: "success" | "error" | "info"): void {
   statusDiv.innerHTML = message;
   statusDiv.className = type;
