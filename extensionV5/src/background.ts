@@ -136,8 +136,8 @@ chrome.webNavigation.onCommitted.addListener(async (details) => {
       return;
     }
 
-    // PAUSE THE REDIRECT - Send to scanner analysis
-    await pauseAndAnalyze(tabId, url);
+    // Pause redirect to analyze
+    await pauseToAnalyze(tabId, url);
   }
 });
 
@@ -259,29 +259,43 @@ function normalizeAiVerdict(rawText: string): "legit" | "phish" | "unknown" {
   return "unknown";
 }
 
-// Pause navigation and send to scanner analysis
-async function pauseAndAnalyze(tabId: number, redirectURL: string) {
+async function pauseToAnalyze(tabId: number, redirectURL: string) {
   console.log("----- REDIRECTION PAUSED -----");
-
-  // Show loading page
   const loadingUrl =
     chrome.runtime.getURL("loading.html") +
     `?url=${encodeURIComponent(redirectURL)}`;
 
-  await chrome.tabs.update(tabId, { url: loadingUrl });
+  try {
+    await chrome.tabs.update(tabId, { url: loadingUrl });
+  } catch (error) {
+    console.error("Failed to pause:", error);
+  }
 
-  let promptText = null;
+  try {
+    await analyze(tabId, redirectURL);
+  } catch (error) {
+    console.error("Failed to analyze (after pausing):", error);
+  }
+}
 
-  promptText = await runScanner(redirectURL);
+async function analyze(tabId: number, redirectURL: string) {
+  // Call VT to scan the URL
+  let promptText: string | null = null;
+  try {
+    promptText = await runScanner(redirectURL);
+  } catch (error) {
+    console.error("Scanner failed:", error);
+  }
 
-  /*if (promptText !== null) {
-    console.log(`\n\n${promptText}\n\n`);
-  }*/
+  if (!promptText) {
+    console.warn(
+      "Scanner did not return prompt text; defaulting to phish verdict."
+    );
+  }
 
-  let verdict = "unknown";
-
-  // AI CALL
+  // Call Vertex AI to analyze the scanned URL
   console.log("AI is analyzing...");
+  let verdict;
 
   if (!!promptText) {
     try {
@@ -289,38 +303,49 @@ async function pauseAndAnalyze(tabId: number, redirectURL: string) {
       verdict = normalizeAiVerdict(aiResponse);
       //console.log("Vertex AI raw response:", aiResponse);
     } catch (error) {
-      console.error("Vertex AI call failed:", error);
+      console.error("Failed to call Vertex AI:", error);
     }
-  } else {
-    console.warn(
-      "Scanner did not return prompt text; defaulting to phish verdict."
-    );
   }
 
-  console.log(`AI's final verdict: 🔥 ${verdict.toUpperCase()} 🔥`);
-
-  // Send verdict to be handled
-  await handleVerdict(tabId, redirectURL, verdict);
+  if (!!verdict) {
+    console.log(`AI's final verdict: 🔥 ${verdict.toUpperCase()} 🔥`);
+    try {
+      await takeAction(tabId, redirectURL, verdict);
+    } catch (error) {
+      console.error("Failed to call takeAction (after the verdict):", error);
+    }
+  }
 }
 
-// Handle verdict from analysis
-async function handleVerdict(tabId: number, url: string, verdict: string) {
+// Take action based on the verdict
+async function takeAction(tabId: number, url: string, verdict: string) {
   //console.log(`📊 VERDICT RECEIVED: ${url} → ${verdict}`);
-
   if (verdict === "phish") {
     console.log("Action: Blocked");
-    await blockAndWarn(tabId, url, verdict);
+    try {
+      await blockAndWarn(tabId, url, verdict);
+    } catch (error) {
+      console.error("Failed to block and warn:", error);
+    }
   } else if (verdict === "legit") {
     console.log("Action: Allowed");
     allowedUrls.add(url);
     // Safe - allow the redirect to continue
-    await chrome.tabs.update(tabId, { url: url });
+    try {
+      await chrome.tabs.update(tabId, { url: url });
+    } catch (error) {
+      console.error("Failed to release legit URL:", error);
+    }
   } else {
     //TODO Add some sorta shit here to handle errors
     console.log("UNKNOWN RETURN VALUE FROM THE AI");
     console.log("Attackers win by default I guess!");
     allowedUrls.add(url);
-    await chrome.tabs.update(tabId, { url: url });
+    try {
+      await chrome.tabs.update(tabId, { url: url });
+    } catch (error) {
+      console.error("Failed to release unknown verdict URL:", error);
+    }
   }
 }
 
@@ -372,7 +397,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // Manual analysis result from loading page buttons
     const { url, tabId, verdict } = msg;
     console.log(`🔥 Manual analysis result received for ${url}: ${verdict}`);
-    handleVerdict(tabId, url, verdict);
+    takeAction(tabId, url, verdict);
     sendResponse({ success: true });
   } else if (msg.type === "requestAnalysis") {
     // EXTERNAL SCRIPT REQUESTING URL TO ANALYZE
