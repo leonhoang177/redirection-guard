@@ -70,8 +70,8 @@
     }
   }
 
-  async function proceedAnyway() {
-    const confirmMessage = `⚠️ Security Warning ⚠️
+async function proceedAnyway() {
+  const confirmMessage = `⚠️ Security Warning ⚠️
 
 Are you absolutely sure you want to visit this potentially dangerous site?
 
@@ -80,29 +80,47 @@ Threat Level: ${verdict.toUpperCase()}
 
 This action may expose you to:
 • Phishing attacks
-• Malware downloads  
+• Malware downloads  
 • Identity theft
 • Data compromise
 
-Type "PROCEED" to confirm:`;
+Click "OK" to proceed or "Cancel" to go back to safety.`;
 
-    const userConfirmation = prompt(confirmMessage);
-    
-    if (userConfirmation === "PROCEED") {
-      try {
-        // Get current tab ID
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        
-        // Send message to background to allow the URL
-        chrome.runtime.sendMessage({
-          type: 'allowUrl',
-          url: blockedUrl,
-          tabId: tab.id
-        });
-      } catch (error) {
-        console.error('Error allowing URL:', error);
-        // Fallback: direct navigation
-        window.location.href = blockedUrl;
-      }
+  const userConfirmed = confirm(confirmMessage);
+  
+  if (userConfirmed) {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      chrome.runtime.sendMessage({
+        type: 'allowUrl',
+        url: blockedUrl,
+        tabId: tab.id
+      });
+    } catch (error) {
+      console.error('Error allowing URL:', error);
+
+      // Fallback: direct navigation
+      window.location.href = blockedUrl;
     }
   }
+}
+
+  document.addEventListener('DOMContentLoaded', () => {
+    
+    // 1. Attach the goBack function to the return button
+    const returnButton = document.getElementById('returnButton');
+    if (returnButton) {
+      returnButton.addEventListener('click', goBack);
+    } else {
+      console.error("CSP Fix: Return button element (#returnButton) not found.");
+    }
+
+    // 2. Attach the proceedAnyway function to the continue button
+    const continueButton = document.getElementById('continueButton');
+    if (continueButton) {
+      continueButton.addEventListener('click', proceedAnyway);
+    } else {
+      console.error("CSP Fix: Continue button element (#continueButton) not found.");
+    }
+  });
