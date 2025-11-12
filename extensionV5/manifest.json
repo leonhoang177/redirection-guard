@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Redirect Guard",
+  "version": "5.0",
+  "description": "Detects and blocks suspicious redirects using AI.",
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "permissions": ["activeTab", "storage", "webNavigation", "tabs", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Redirect Guard - Click to configure"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["warning.html", "loading.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
