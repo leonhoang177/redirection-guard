@@ -259,6 +259,11 @@ function normalizeAiVerdict(rawText: string): "legit" | "phish" | "unknown" {
   return "unknown";
 }
 
+type AnalyzeOutcome = {
+  verdict: "legit" | "phish" | "unknown";
+  jsonOutput: string;
+};
+
 async function pauseToAnalyze(tabId: number, redirectURL: string) {
   console.log("----- REDIRECTION PAUSED -----");
   const loadingUrl =
@@ -272,45 +277,62 @@ async function pauseToAnalyze(tabId: number, redirectURL: string) {
   }
 
   try {
-    const verdict = await analyze(tabId, redirectURL);
-    if (!!verdict) {
+    const verdictResult = await analyze(tabId, redirectURL);
+    if (!verdictResult) {
+      return;
+    }
+
+    if (verdictResult === "waitlist") {
+      console.log("Scanner waitlisted URL; allowing navigation for now.");
       try {
-        await takeAction(tabId, redirectURL, verdict);
+        await takeAction(tabId, redirectURL, "unknown");
       } catch (error) {
-        console.error("Failed to call takeAction (after analyze):", error);
+        console.error("Failed to handle waitlist verdict:", error);
       }
+      return;
+    }
+
+    try {
+      await takeAction(tabId, redirectURL, verdictResult.verdict);
+    } catch (error) {
+      console.error("Failed to call takeAction (after analyze):", error);
     }
   } catch (error) {
     console.error("Failed to analyze (after pausing):", error);
   }
 }
 
-async function analyze(tabId: number | null, redirectURL: string) {
+async function analyze(
+  tabId: number | null,
+  redirectURL: string
+): Promise<AnalyzeOutcome | "waitlist" | null> {
   // Call VT to scan the URL
-  let promptText: string | null = null;
+  let scannerResult: Awaited<ReturnType<typeof runScanner>> | null = null;
   try {
-    promptText = await runScanner(redirectURL);
+    scannerResult = await runScanner(redirectURL);
   } catch (error) {
     console.error("Scanner failed:", error);
   }
 
-  if (!promptText) {
-    console.log("Scanner return a null promptText.");
+  if (!scannerResult) {
+    console.log("Scanner returned no result.");
     return null;
   }
 
-  if (promptText === "waitlist") {
+  if (scannerResult === "waitlist") {
     console.log("Scanner send URL to waitlist");
     return "waitlist";
   }
+
+  const { promptOutput, jsonOutput } = scannerResult;
 
   // Call Vertex AI to analyze the scanned URL
   console.log("AI is analyzing...");
   let verdict;
 
-  if (!!promptText) {
+  if (!!promptOutput) {
     try {
-      const aiResponse = await requestVertexClassification(promptText);
+      const aiResponse = await requestVertexClassification(promptOutput);
       verdict = normalizeAiVerdict(aiResponse);
       //console.log("Vertex AI raw response:", aiResponse);
     } catch (error) {
@@ -320,9 +342,13 @@ async function analyze(tabId: number | null, redirectURL: string) {
 
   if (!!verdict) {
     console.log(`AI's final verdict: 🔥 ${verdict.toUpperCase()} 🔥`);
+    return {
+      verdict,
+      jsonOutput,
+    };
   }
 
-  return verdict ?? null;
+  return null;
 }
 
 // Take action based on the verdict
@@ -405,15 +431,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const { url } = msg;
     (async () => {
       try {
-        const verdict = await analyze(null, url);
-        if (!verdict) {
+        const result = await analyze(null, url);
+        if (!result) {
           sendResponse({
             success: false,
             error: "AI did not return a verdict.",
           });
           return;
         }
-        sendResponse({ success: true, verdict });
+
+        if (result === "waitlist") {
+          sendResponse({ success: true, verdict: "waitlist" });
+          return;
+        }
+
+        sendResponse({
+          success: true,
+          verdict: result.verdict,
+          jsonOutput: result.jsonOutput,
+        });
       } catch (error) {
         console.error("Popup analyze request failed:", error);
         sendResponse({

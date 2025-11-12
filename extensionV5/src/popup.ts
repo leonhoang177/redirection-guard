@@ -1,6 +1,7 @@
 interface BackgroundAnalysisResponse {
   success: boolean;
   verdict?: string;
+  jsonOutput?: string;
   error?: string;
 }
 
@@ -133,7 +134,7 @@ async function analyzeURL(url: string): Promise<void> {
 
     displayResults(url, {
       verdict: analysis.verdict,
-      reasons: [`Vertex AI final verdict: ${analysis.verdict.toUpperCase()}`],
+      jsonOutput: analysis.jsonOutput,
     });
     showStatus(`✅ Scan completed!`, "success", 3_000);
   } catch (error: any) {
@@ -147,9 +148,9 @@ async function analyzeURL(url: string): Promise<void> {
 // Display Results
 function displayResults(
   url: string,
-  analysis: { verdict: string; reasons: string[] }
+  analysis: { verdict: string; jsonOutput?: string }
 ): void {
-  const { verdict, reasons } = analysis;
+  const { verdict, jsonOutput } = analysis;
   const verdictLower = verdict.toLowerCase();
   const verdictUpper = verdict.toUpperCase();
   const verdictClass = getVerdictClass(verdictLower);
@@ -164,36 +165,12 @@ function displayResults(
   verdictDisplay.className = `verdict-display ${verdictClass}`;
   verdictDisplay.style.display = "block";
 
-  // Parse URL for display
-  let urlObj;
-  try {
-    urlObj = new URL(url);
-  } catch {
-    urlObj = { hostname: "Invalid URL" };
-  }
+  const detailRows = formatJsonDetails(jsonOutput, url);
 
-  // Prepare detailed results
   detailedResults.innerHTML = `
     <div class="result-section">
-      <h3>🔎 URL Information</h3>
-      <div class="result-item">
-        <span class="result-label">Domain:</span>
-        <span class="result-value">${urlObj.hostname}</span>
-      </div>
-      <div class="result-item">
-        <span class="result-label">HTTPS:</span>
-        <span class="result-value">${
-          url.startsWith("https") ? "✅ Yes" : "❌ No"
-        }</span>
-      </div>
-      <div class="result-item">
-        <span class="result-label">IP Address:</span>
-        <span class="result-value">${
-          /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(urlObj.hostname)
-            ? "⚠️ Yes"
-            : "✅ No"
-        }</span>
-      </div>
+      <h3>📊 Scan Details</h3>
+      ${detailRows}
     </div>
   `;
 
@@ -242,6 +219,119 @@ function getVerdictIcon(verdict: string): string {
     default:
       return "❓";
   }
+}
+
+function formatJsonDetails(jsonOutput: string | undefined, fallbackUrl: string) {
+  if (!jsonOutput) {
+    return `
+      <div class="result-item">
+        <span class="result-label">Details:</span>
+        <span class="result-value">No scanner data available for ${escapeHtml(
+          fallbackUrl
+        )}.</span>
+      </div>
+    `;
+  }
+
+  try {
+    const parsed = JSON.parse(jsonOutput) as Record<string, unknown>;
+    const prioritizedKeys = [
+      "url",
+      "hostname",
+      "title",
+      "isHttps",
+      "reputation",
+      "maliciousVotes",
+      "suspiciousVotes",
+      "services",
+      "features",
+      "redirectCount",
+      "domainAge",
+      "networkCountry",
+      "serverName",
+    ];
+    const orderedKeys = [
+      ...new Set([...prioritizedKeys, ...Object.keys(parsed)]),
+    ];
+    const rows = orderedKeys
+      .filter((key) => Object.prototype.hasOwnProperty.call(parsed, key))
+      .map((key) => {
+        const value = parsed[key];
+        return `
+          <div class="result-item">
+            <span class="result-label">${formatDetailKey(key)}:</span>
+            <span class="result-value">${formatDetailValue(value)}</span>
+          </div>
+        `;
+      });
+
+    if (rows.length === 0) {
+      return `
+        <div class="result-item">
+          <span class="result-label">Details:</span>
+          <span class="result-value">Scanner returned an empty payload.</span>
+        </div>
+      `;
+    }
+
+    return rows.join("");
+  } catch (error) {
+    console.error("Failed to parse jsonOutput:", error);
+    return `
+      <div class="result-item">
+        <span class="result-label">Raw JSON:</span>
+        <span class="result-value code-block">${escapeHtml(jsonOutput)}</span>
+      </div>
+    `;
+  }
+}
+
+function formatDetailKey(key: string): string {
+  const base = key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (c) => c.toUpperCase());
+
+  return base
+    .replace(/M\s*I\s*M\s*E/gi, "MIME")
+    .replace(/S\s*A\s*N/gi, "SAN")
+    .replace(/U\s*R\s*L/gi, "URL");
+}
+
+function formatDetailValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "✅ True" : "❌ False";
+  }
+
+  if (typeof value === "number") {
+    return value.toString();
+  }
+
+  if (typeof value === "string") {
+    return escapeHtml(value);
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "—";
+    return value.map((item) => formatDetailValue(item)).join(", ");
+  }
+
+  return escapeHtml(JSON.stringify(value));
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function showStatus(

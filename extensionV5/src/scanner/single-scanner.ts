@@ -1528,7 +1528,14 @@ export async function scanURL(
   }
 }
 
-export async function runScanner(urlArg?: string): Promise<string | null> {
+export interface ScannerOutputs {
+  jsonOutput: string;
+  promptOutput: string;
+}
+
+export type RunScannerResult = ScannerOutputs | "waitlist" | null;
+
+export async function runScanner(urlArg?: string): Promise<RunScannerResult> {
   const target = urlArg ?? HARDCODED_URL;
   const result = await scanURL(target, { rawUrl: target });
 
@@ -1542,7 +1549,17 @@ export async function runScanner(urlArg?: string): Promise<string | null> {
   }
 
   const flattenedOutput = result.data;
+  const jsonOutput = JSON.stringify(flattenedOutput, null, 2);
+  console.log(`\n\n${jsonOutput}\n\n`);
   const promptOutput = formatPrompt(flattenedOutput, INSTRUCTION || "");
 
-  return promptOutput;
+  if (!promptOutput) {
+    console.warn("No prompt generated; missing or empty instruction.");
+    return null;
+  }
+
+  return {
+    jsonOutput,
+    promptOutput,
+  };
 }
