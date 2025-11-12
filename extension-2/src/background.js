@@ -23,7 +23,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 // *** MODEL CONFIGURATION ***
                 const PROJECT_ID = "redirectguard-477115";
                 const REGION = "us-central1";
-                const ENDPOINT_ID = "1823226673852579840";
+                const ENDPOINT_ID = "2748153447323795456";
                 const apiUrl = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/endpoints/${ENDPOINT_ID}:generateContent`;
                 const requestBody = {
                     contents: [

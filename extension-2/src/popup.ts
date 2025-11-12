@@ -9,8 +9,8 @@ const triggerButton = document.getElementById(
 const statusDiv = document.getElementById("status") as HTMLDivElement;
 
 triggerButton.addEventListener("click", () => {
-  statusDiv.textContent = "Preparing hardcoded content for LLM...";
-  triggerButton.disabled = true;
+  statusDiv.textContent = "Preparing content...";
+  triggerButton.disabled = false;
 
   chrome.runtime.sendMessage(
     {
