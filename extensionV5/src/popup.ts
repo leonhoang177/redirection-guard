@@ -147,8 +147,11 @@ function displayResults(
 
   // Show simple verdict prominently
   verdictDisplay.innerHTML = `
-    <div class="verdict-icon">${getVerdictIcon(verdict.toUpperCase())}</div>
-    <div class="verdict-text">This URL is ${verdict.toUpperCase()}</div>
+    <div class="verdict-display">
+      <div class="verdict-${verdict}">${verdict.toUpperCase()}</div>
+      <div class="verdict-icon">${getVerdictIcon(verdict)}</div>
+    </div>
+
   `;
   verdictDisplay.className = `verdict-display ${verdictClass}`;
   verdictDisplay.style.display = "block";
@@ -244,12 +247,10 @@ function displayResults(
 // Get Verdict CSS Class
 function getVerdictClass(verdict: string): string {
   switch (verdict) {
-    case "SAFE":
-      return "verdict-safe";
-    case "SUSPICIOUS":
-      return "verdict-suspicious";
-    case "MALICIOUS":
-      return "verdict-malicious";
+    case "legit":
+      return "verdict-legit";
+    case "phish":
+      return "verdict-phish";
     default:
       return "verdict-unknown";
   }
@@ -258,12 +259,10 @@ function getVerdictClass(verdict: string): string {
 // Get Verdict Icon
 function getVerdictIcon(verdict: string): string {
   switch (verdict) {
-    case "SAFE":
+    case "legit":
       return "✅";
-    case "SUSPICIOUS":
+    case "phish":
       return "⚠️";
-    case "MALICIOUS":
-      return "🚨";
     default:
       return "❓";
   }
@@ -302,9 +301,12 @@ function showLoader(show: boolean): void {
 }
 
 function isValidUrl(url: string): boolean {
+  if (!(url.startsWith("http://") || url.startsWith("https://"))) {
+    return false;
+  }
   try {
-    new URL(url);
-    return true;
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
   } catch {
     return false;
   }

@@ -17,13 +17,9 @@
   "devDependencies": {
     "@types/chrome": "^0.0.268",
     "@types/node": "^24.10.1",
-    "buffer": "^6.0.3",
     "parcel": "^2.12.0",
-    "path-browserify": "^1.0.1",
-    "process": "^0.11.10",
     "rimraf": "^6.0.1",
-    "typescript": "^5.3.3",
-    "url": "^0.11.4"
+    "typescript": "^5.3.3"
   },
   "keywords": [
     "chrome-extension",
