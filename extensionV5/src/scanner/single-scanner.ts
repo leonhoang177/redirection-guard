@@ -1463,7 +1463,7 @@ function describeLogTarget(url: string, context?: ScanContext): string {
   return url;
 }
 
-export async function scanUrl(
+export async function scanURL(
   target: string,
   context: ScanContext = {}
 ): Promise<ScanResult> {
@@ -1530,11 +1530,11 @@ export async function scanUrl(
 
 export async function runScanner(urlArg?: string): Promise<string | null> {
   const target = urlArg ?? HARDCODED_URL;
-  const result = await scanUrl(target, { rawUrl: target });
+  const result = await scanURL(target, { rawUrl: target });
 
   if (result.status === "waitlist") {
     console.log("URL added to waitlist; no output generated yet.");
-    return null;
+    return "waitlist";
   }
   if (result.status === "error") {
     console.error("Scan failed:", result.error);

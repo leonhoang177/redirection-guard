@@ -295,9 +295,13 @@ async function analyze(tabId: number | null, redirectURL: string) {
   }
 
   if (!promptText) {
-    console.warn(
-      "Scanner did not return prompt text; defaulting to phish verdict."
-    );
+    console.log("Scanner return a null promptText.");
+    return null;
+  }
+
+  if (promptText === "waitlist") {
+    console.log("Scanner send URL to waitlist");
+    return "waitlist";
   }
 
   // Call Vertex AI to analyze the scanned URL

@@ -28,6 +28,7 @@ const protectedCount = document.getElementById(
 ) as HTMLSpanElement;
 
 let showDetailedResults = false;
+let statusHideTimeoutId: number | null = null;
 
 // Initialize
 document.addEventListener("DOMContentLoaded", async () => {
@@ -66,7 +67,7 @@ scanBtn.addEventListener("click", async () => {
     return;
   }
 
-  await scanURL(url);
+  await analyzeURL(url);
 });
 
 // Scan Current Tab
@@ -91,7 +92,7 @@ scanCurrentBtn.addEventListener("click", async () => {
     }
 
     urlInput.value = tab.url;
-    await scanURL(tab.url);
+    await analyzeURL(tab.url);
   } catch (error) {
     showStatus("Error accessing current tab", "error");
     console.error(error);
@@ -99,23 +100,43 @@ scanCurrentBtn.addEventListener("click", async () => {
 });
 
 // Scan URL Function (using local heuristics)
-async function scanURL(url: string): Promise<void> {
+async function analyzeURL(url: string): Promise<void> {
   showLoader(true);
   showStatus("🔎 Analyzing URL for suspicious patterns...", "info");
   results.style.display = "none";
 
   try {
-    // Get analysis from background script
-    const analysis = (await chrome.runtime.sendMessage({
-      type: "analyzeUrl",
-      url,
-    })) as BackgroundAnalysisResponse;
+    // Get analysis from background script (handle waitlist retries)
+    let analysis: BackgroundAnalysisResponse | null = null;
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    if (!analysis || !analysis.success || !analysis.verdict) {
-      throw new Error(
-        analysis?.error ?? "Failed to analyze URL: No verdict returned."
-      );
-    }
+    do {
+      analysis = (await chrome.runtime.sendMessage({
+        type: "analyzeUrl",
+        url,
+      })) as BackgroundAnalysisResponse;
+
+      if (!analysis || !analysis.success || !analysis.verdict) {
+        throw new Error(
+          analysis?.error ?? "Failed to analyze URL: No verdict returned."
+        );
+      }
+
+      if (analysis.verdict === "waitlist") {
+        retryCount++;
+        if (retryCount > maxRetries) {
+          throw new Error("Analysis is still pending after multiple attempts.");
+        }
+
+        showStatus(
+          "Encounter a new URL: We need more time to scan...",
+          "info",
+          10_000
+        );
+        await delay(10_000);
+      }
+    } while (analysis?.verdict === "waitlist");
 
     console.log("analysis: ", analysis);
 
@@ -125,7 +146,8 @@ async function scanURL(url: string): Promise<void> {
     });
     showStatus(
       `✅ Scan completed! Verdict: ${analysis.verdict.toUpperCase()}`,
-      "success"
+      "success",
+      3_000
     );
   } catch (error: any) {
     showStatus(`Error: ${error.message}`, "error");
@@ -251,15 +273,25 @@ async function updateStats(): Promise<void> {
   }
 }
 
-function showStatus(message: string, type: "success" | "error" | "info"): void {
+function showStatus(
+  message: string,
+  type: "success" | "error" | "info",
+  autoHideMs?: number
+): void {
+  if (statusHideTimeoutId !== null) {
+    clearTimeout(statusHideTimeoutId);
+    statusHideTimeoutId = null;
+  }
+
   statusDiv.innerHTML = message;
   statusDiv.className = type;
   statusDiv.style.display = "block";
 
-  if (type === "success") {
-    setTimeout(() => {
+  if (autoHideMs && autoHideMs > 0) {
+    statusHideTimeoutId = window.setTimeout(() => {
       statusDiv.style.display = "none";
-    }, 3000);
+      statusHideTimeoutId = null;
+    }, autoHideMs);
   }
 }
 
@@ -279,6 +311,10 @@ function isValidUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Add keyboard shortcut for current tab
