@@ -11,11 +11,10 @@ dist/
 build/
 .cache/
 logs/
-.env
+
+# Secret
+vertexConfig.ts
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # IDEs / Editors
 .vscode/

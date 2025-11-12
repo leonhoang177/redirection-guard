@@ -1,14 +1,7 @@
-// pnpm add dotenv tldts
-// pnpm add -D @types/node @types/chrome
-// pnpm run build
-
 /// <reference types="chrome"/>
 
-// Import the scanner API
-// import { analyzeUrl, ScannerResponse } from './scanner/scanner-api';
-
-// @ts-ignore: importing TS file as JS module
 import { runScanner } from "./scanner/single-scanner.js";
+import { VERTEX_AI_CONFIG } from "./vertexConfig";
 
 console.log("🟢 Redirect Guard: Background service worker initialized");
 
@@ -24,12 +17,6 @@ interface NavigationInfo {
 const activeNavigations = new Map<number, NavigationInfo>();
 const allowedUrls = new Set<string>(); // URLs user chose to proceed to
 const safeOrigins = new Set<string>(); // Known safe domains to skip
-
-const VERTEX_AI_CONFIG = {
-  PROJECT_ID: "redirectguard-477115",
-  REGION: "us-central1",
-  ENDPOINT_ID: "2748153447323795456",
-} as const;
 
 // Initialize extension
 chrome.runtime.onInstalled.addListener(() => {
@@ -84,7 +71,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   // Skip system URLs
   if (isSystemUrl(url)) return;
 
-  console.log(`🔍 Navigation started: ${url}`);
+  console.log(`🔍 Navigated to systemURL: ${url}`);
 
   // Store navigation info
   activeNavigations.set(tabId, {
@@ -127,7 +114,7 @@ chrome.webNavigation.onCommitted.addListener(async (details) => {
 
   if (isServerRedirect || isClientRedirect || isCrossDomain) {
     console.log(
-      `----------REDIRECT DETECTED----------\nDestination: ${url}\nType: ${transitionQualifiers.join(
+      `----- REDIRECTION DETECTED -----\nDestination: ${url}\nType: ${transitionQualifiers.join(
         ", "
       )}`
     );
@@ -274,7 +261,7 @@ function normalizeAiVerdict(rawText: string): "legit" | "phish" | "unknown" {
 
 // Pause navigation and send to scanner analysis
 async function pauseAndAnalyze(tabId: number, redirectURL: string) {
-  console.log("--Redirect paused--");
+  console.log("----- REDIRECTION PAUSED -----");
 
   // Show loading page
   const loadingUrl =
@@ -294,7 +281,7 @@ async function pauseAndAnalyze(tabId: number, redirectURL: string) {
   let verdict = "unknown";
 
   // AI CALL
-  console.log("AI Analyzing...");
+  console.log("AI is analyzing...");
 
   if (!!promptText) {
     try {
@@ -310,7 +297,7 @@ async function pauseAndAnalyze(tabId: number, redirectURL: string) {
     );
   }
 
-  console.log(`⚖️ AI's verdict: ${redirectURL}: ${verdict}`);
+  console.log(`AI's final verdict: 🔥 ${verdict.toUpperCase()} 🔥`);
 
   // Send verdict to be handled
   await handleVerdict(tabId, redirectURL, verdict);
@@ -321,10 +308,10 @@ async function handleVerdict(tabId: number, url: string, verdict: string) {
   //console.log(`📊 VERDICT RECEIVED: ${url} → ${verdict}`);
 
   if (verdict === "phish") {
-    console.log("🚫 Blocked");
+    console.log("Action: Blocked");
     await blockAndWarn(tabId, url, verdict);
   } else if (verdict === "legit") {
-    console.log("✅ Allowed");
+    console.log("Action: Allowed");
     allowedUrls.add(url);
     // Safe - allow the redirect to continue
     await chrome.tabs.update(tabId, { url: url });
@@ -357,7 +344,7 @@ async function blockAndWarn(tabId: number, url: string, verdict: string) {
       },
     });
 
-    console.log(`Blocked ${verdict} redirect and showed warning`);
+    //console.log(`Blocked ${verdict} redirect and showed warning`);
   } catch (error) {
     console.error("Error blocking navigation:", error);
   }

@@ -1474,7 +1474,8 @@ export async function scanUrl(
       error: "Invalid URL. Please provide an URL starts with 'http' or 'https'",
     };
   }
-  console.log(`VirusTotal is scanning: ${describeLogTarget(url, context)}`);
+  //console.log(`VirusTotal is scanning: ${describeLogTarget(url, context)}`);
+  console.log("VirusTotal is scanning...");
 
   try {
     let urlReport: any | null = null;
