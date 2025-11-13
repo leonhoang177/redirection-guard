@@ -48,7 +48,7 @@ const ABSENT = null;
 type OutputMask = Record<string, string | null>;
 
 export const INSTRUCTION =
-  "INSTRUCT: Cyber Security Analyst. Classify: 'phish' or 'legit'.::EXP: null=failed to read. isHttps=URL secure. entropy=avg randomness. similarity=avg text match. dnsRatio=age/count. faviconMatch=favicon URL match host. tlsSubjectMatch=TLS subject match host.::HINTS: Higher reputation: more % legit. maliciousVotes>0: 100% phish. domainValidDays<366: 75% phish. isHttps=false: 75% phish. suspiciousVotes>0: 75% phish. nullCount>=10: 75% phish";
+  "INSTRUCT: You are a Cyber Security Analyst who classify: 'phish' or 'legit' using provided data ::EXP: null:failed to read | isHttps:URL secure | entropy:avg randomness | similarity:avg text match | faviconMatch:favicon URL match host | tlsSubjectMatch:TLS subject match host ::HINTS: higher reputation:more % legit | higher dnsRatio:more % legit | higher domainValidDays: more % legit | maliciousVotes=0:no knowledge | maliciousVotes=1:75% phish | maliciousVotes>1:100% phish | suspiciousVotes=0:no knowledge | suspiciousVotes=1:25% phish | suspiciousVotes>1:50% phish | higher nullCount:more % phish | isHttps=false:75% phish ";
 
 const CUSTOMED_FIELDS_NAME = {
   url: "url",
