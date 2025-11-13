@@ -1550,9 +1550,9 @@ export async function runScanner(urlArg?: string): Promise<RunScannerResult> {
 
   const flattenedOutput = result.data;
   const jsonOutput = JSON.stringify(flattenedOutput, null, 2);
-  console.log(`\n\n${jsonOutput}\n\n`);
+  //console.log(`\n\n${jsonOutput}\n\n`);
   const promptOutput = formatPrompt(flattenedOutput, INSTRUCTION || "");
-
+  console.log(`\n\n${promptOutput}\n\n`);
   if (!promptOutput) {
     console.warn("No prompt generated; missing or empty instruction.");
     return null;
