@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Chrome extension to detect phishing and malicious URLs using VirusTotal",
   "scripts": {
-    "clean": "rimraf dist",
+    "clean": "rimraf dist/background.* dist/popup.*",
     "build": "pnpm run clean && parcel build src/background.ts src/popup.ts --target chrome-extension",
     "watch": "parcel watch src/background.ts src/popup.ts --target chrome-extension"
   },
