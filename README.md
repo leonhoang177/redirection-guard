@@ -13,7 +13,7 @@ Follow these steps to set up and load the extension in Chrome:
 
 ```bash
 git clone https://github.com/<your-username>/redirection-guard.git
-cd redirection-guard/extension
+cd redirection-guard/extensionV5
 ```
 
 ### 2️⃣ Install pnpm (if not already installed)
